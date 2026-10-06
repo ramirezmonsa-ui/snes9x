@@ -7,15 +7,18 @@ juegos de Super Nintendo en el celular.
 
 - Abre ROMs `.sfc`, `.smc`, `.swc`, `.fig` y `.zip` con el selector de
   archivos de Android (no pide permisos de almacenamiento).
-- Lista de juegos recientes (mantén presionado un juego para quitarlo).
+- Biblioteca con tarjetas de color, y un acceso directo a "Seguir jugando"
+  con el último juego (mantén presionado un juego para quitarlo).
 - Controles táctiles: cruceta, A/B/X/Y, L/R, Start y Select.
 - Mandos Bluetooth/USB (Xbox, PlayStation, 8BitDo...) y teclado.
 - Guardado del juego (SRAM) automático, como el cartucho original.
 - Guardar y cargar partida en cualquier momento (estado), desde el menú.
 - Funciona en vertical y horizontal.
 
-En el juego, el botón **Atrás** abre el menú (continuar, guardar o cargar
-partida, reiniciar, ocultar los controles y salir).
+En el juego, el botón de **pausa** (arriba), el botón **Atrás** o el botón
+**Home** del control abren el menú: continuar, guardar o cargar partida,
+mostrar u ocultar los controles táctiles, reiniciar y salir. Con un control
+se navega con la cruceta, **A** elige y **B** cierra.
 
 ## Jugar con un control (por ejemplo EasySMX M15)
 
@@ -78,7 +81,9 @@ El APK queda en `android/app/build/outputs/apk/release/`.
 | `EmulatorThread.java` | Hilo que corre el emulador, dibuja cada cuadro y reproduce el audio. |
 | `GamepadView.java` | El control táctil en pantalla. |
 | `GameActivity.java` | Pantalla de juego: menú, partidas guardadas y mandos físicos. |
-| `MainActivity.java` | Pantalla de inicio con la lista de juegos. |
+| `MainActivity.java` | Pantalla de inicio: "Seguir jugando" y la biblioteca. |
+| `ActionSheet.java` | Los paneles de opciones (menú de pausa, opciones de un juego). |
+| `Ui.java` | Colores y estilos compartidos. |
 | `RomLoader.java` | Lee la ROM (y la saca del `.zip` si hace falta). |
 
 ## Aviso

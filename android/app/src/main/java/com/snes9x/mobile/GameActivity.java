@@ -1,13 +1,14 @@
 package com.snes9x.mobile;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.format.DateUtils;
+import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -18,6 +19,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -41,6 +43,7 @@ public class GameActivity extends Activity
 
     private InputManager inputManager;
     private boolean controllerConnected;
+    private int openMenus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +60,21 @@ public class GameActivity extends Activity
             updateButtons();
         });
         root.addView(gamepad);
+
+        // Pause button at the top, the easiest way to reach the menu.
+        ImageView pause = new ImageView(this);
+        pause.setImageDrawable(Ui.icon(this, R.drawable.ic_pause, 0xFFFFFFFF));
+        int pausePad = Ui.dp(this, 10);
+        pause.setPadding(pausePad, pausePad, pausePad, pausePad);
+        pause.setBackground(Ui.rounded(0x66000000, Ui.dp(this, 22)));
+        pause.setAlpha(0.8f);
+        pause.setContentDescription(getString(R.string.menu_paused));
+        pause.setOnClickListener(v -> showMenu());
+        FrameLayout.LayoutParams pauseParams = new FrameLayout.LayoutParams(
+                Ui.dp(this, 44), Ui.dp(this, 44), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        pauseParams.topMargin = Ui.dp(this, 14);
+        root.addView(pause, pauseParams);
+
         setContentView(root);
         hideSystemBars();
 
@@ -113,7 +131,7 @@ public class GameActivity extends Activity
     protected void onResume() {
         super.onResume();
         hideSystemBars();
-        if (emulator != null) {
+        if (emulator != null && openMenus == 0) {
             emulator.setPaused(false);
         }
     }
@@ -194,50 +212,69 @@ public class GameActivity extends Activity
     }
 
     private void showMenu() {
+        if (openMenus > 0) {
+            return;
+        }
+        pauseForMenu();
+        // Forget held buttons so nothing stays pressed after closing the menu.
+        keyButtons = 0;
+        axisButtons = 0;
+        triggerButtons = 0;
+        updateButtons();
+
+        File state = stateFile();
+        String saved = state.isFile()
+                ? getString(R.string.state_saved_at, DateUtils.getRelativeTimeSpanString(
+                        state.lastModified(), System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS))
+                : getString(R.string.state_none);
+        boolean touchVisible = gamepad.getVisibility() == View.VISIBLE;
+
+        new ActionSheet(this)
+                .title(gameName)
+                .subtitle(getString(R.string.menu_paused))
+                .action(R.drawable.ic_play, getString(R.string.menu_resume), null)
+                .action(R.drawable.ic_save, getString(R.string.menu_save_state),
+                        getString(R.string.menu_save_state_detail), this::saveState)
+                .action(R.drawable.ic_history, getString(R.string.menu_load_state), saved,
+                        this::loadState)
+                .action(R.drawable.ic_gamepad, getString(touchVisible
+                        ? R.string.menu_hide_controls : R.string.menu_show_controls),
+                        () -> gamepad.setVisibility(touchVisible ? View.GONE : View.VISIBLE))
+                .action(R.drawable.ic_refresh, getString(R.string.menu_reset), this::confirmReset)
+                .danger(R.drawable.ic_exit, getString(R.string.menu_quit), this::finish)
+                .onDismiss(this::onMenuClosed)
+                .show();
+    }
+
+    private void confirmReset() {
+        pauseForMenu();
+        new ActionSheet(this)
+                .title(getString(R.string.reset_title))
+                .subtitle(getString(R.string.reset_body))
+                .danger(R.drawable.ic_refresh, getString(R.string.reset_confirm), NativeBridge::reset)
+                .action(R.drawable.ic_play, getString(R.string.cancel), null)
+                .onDismiss(this::onMenuClosed)
+                .show();
+    }
+
+    private void pauseForMenu() {
+        openMenus++;
         if (emulator != null) {
             emulator.setPaused(true);
         }
-        String[] items = {
-            getString(R.string.menu_resume),
-            getString(R.string.menu_save_state),
-            getString(R.string.menu_load_state),
-            getString(R.string.menu_reset),
-            getString(gamepad.getVisibility() == View.VISIBLE
-                    ? R.string.menu_hide_controls : R.string.menu_show_controls),
-            getString(R.string.menu_quit),
-        };
+    }
 
-        new AlertDialog.Builder(this)
-                .setTitle(gameName)
-                .setItems(items, (dialog, which) -> {
-                    switch (which) {
-                        case 1:
-                            saveState();
-                            break;
-                        case 2:
-                            loadState();
-                            break;
-                        case 3:
-                            NativeBridge.reset();
-                            break;
-                        case 4:
-                            gamepad.setVisibility(gamepad.getVisibility() == View.VISIBLE
-                                    ? View.GONE : View.VISIBLE);
-                            break;
-                        case 5:
-                            finish();
-                            return;
-                        default:
-                            break;
-                    }
-                })
-                .setOnDismissListener(dialog -> {
-                    hideSystemBars();
-                    if (emulator != null && !isFinishing()) {
-                        emulator.setPaused(false);
-                    }
-                })
-                .show();
+    /** Resumes the game once the last open menu closes. */
+    private void onMenuClosed() {
+        openMenus--;
+        if (openMenus > 0) {
+            return;
+        }
+        hideSystemBars();
+        if (emulator != null && !isFinishing()) {
+            emulator.setPaused(false);
+        }
     }
 
     // --- Saves --------------------------------------------------------------
