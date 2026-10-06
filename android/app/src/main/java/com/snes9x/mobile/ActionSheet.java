@@ -25,13 +25,16 @@ import java.util.List;
  */
 final class ActionSheet {
     private static final class Action {
+        final int color;
         final int icon;
         final CharSequence label;
         final CharSequence detail;
         final boolean danger;
         final Runnable run;
 
-        Action(int icon, CharSequence label, CharSequence detail, boolean danger, Runnable run) {
+        Action(int color, int icon, CharSequence label, CharSequence detail, boolean danger,
+                Runnable run) {
+            this.color = color;
             this.icon = icon;
             this.label = label;
             this.detail = detail;
@@ -61,17 +64,18 @@ final class ActionSheet {
         return this;
     }
 
-    ActionSheet action(int icon, CharSequence label, Runnable run) {
-        return action(icon, label, null, run);
+    /** {@code color} is the color of the round icon, like a controller button. */
+    ActionSheet action(int color, int icon, CharSequence label, Runnable run) {
+        return action(color, icon, label, null, run);
     }
 
-    ActionSheet action(int icon, CharSequence label, CharSequence detail, Runnable run) {
-        actions.add(new Action(icon, label, detail, false, run));
+    ActionSheet action(int color, int icon, CharSequence label, CharSequence detail, Runnable run) {
+        actions.add(new Action(color, icon, label, detail, false, run));
         return this;
     }
 
     ActionSheet danger(int icon, CharSequence label, Runnable run) {
-        actions.add(new Action(icon, label, null, true, run));
+        actions.add(new Action(Ui.DANGER, icon, label, null, true, run));
         return this;
     }
 
@@ -88,10 +92,13 @@ final class ActionSheet {
         LinearLayout panel = new LinearLayout(context);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(pad, pad, pad, Ui.dp(context, 12));
-        panel.setBackground(Ui.rounded(Ui.SURFACE, Ui.dp(context, 28)));
+        android.graphics.drawable.GradientDrawable background =
+                Ui.rounded(Ui.SURFACE, Ui.dp(context, 28));
+        background.setStroke(Ui.dp(context, 2), Ui.SURFACE_HIGH);
+        panel.setBackground(background);
 
         if (title != null) {
-            TextView titleView = Ui.text(context, title, 22, Ui.TEXT, true);
+            TextView titleView = Ui.label(context, title, 24, Ui.TEXT);
             titleView.setMaxLines(2);
             titleView.setEllipsize(TextUtils.TruncateAt.END);
             panel.addView(titleView);
@@ -123,7 +130,7 @@ final class ActionSheet {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             window.setGravity(Gravity.CENTER);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setDimAmount(0.6f);
+            window.setDimAmount(0.45f);
         }
 
         dialog.setOnKeyListener((d, keyCode, event) -> {
@@ -180,18 +187,14 @@ final class ActionSheet {
         row.setFocusable(true);
         row.setClickable(true);
 
-        // Icon in a soft tinted circle.
-        ImageView icon = new ImageView(context);
-        icon.setImageDrawable(Ui.icon(context, action.icon, action.danger ? Ui.DANGER : Ui.ACCENT));
-        int iconPad = Ui.dp(context, 9);
-        icon.setPadding(iconPad, iconPad, iconPad, iconPad);
-        icon.setBackground(Ui.rounded(action.danger ? 0x26F87171 : 0x268B5CF6, Ui.dp(context, 21)));
-        row.addView(icon, new LinearLayout.LayoutParams(Ui.dp(context, 42), Ui.dp(context, 42)));
+        int size = Ui.dp(context, 44);
+        ImageView icon = Ui.faceButton(context, action.icon, action.color, size);
+        row.addView(icon, new LinearLayout.LayoutParams(size, size));
 
         LinearLayout labels = new LinearLayout(context);
         labels.setOrientation(LinearLayout.VERTICAL);
         labels.setPadding(Ui.dp(context, 16), 0, 0, 0);
-        labels.addView(Ui.text(context, action.label, 17, color, true));
+        labels.addView(Ui.label(context, action.label, 18, color));
         if (action.detail != null) {
             labels.addView(Ui.text(context, action.detail, 13, Ui.TEXT_DIM, false));
         }

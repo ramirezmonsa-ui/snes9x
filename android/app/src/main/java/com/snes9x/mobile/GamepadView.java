@@ -44,16 +44,16 @@ public class GamepadView extends View {
         }
     }
 
-    // Colors of the SNES PAL/Japanese controller face buttons.
+    // Colors of the Super Nintendo controller buttons.
     private final Button[] buttons = {
-        new Button(NativeBridge.BUTTON_A, "A", 0xFFD32F2F),
-        new Button(NativeBridge.BUTTON_B, "B", 0xFFF9A825),
-        new Button(NativeBridge.BUTTON_X, "X", 0xFF1976D2),
-        new Button(NativeBridge.BUTTON_Y, "Y", 0xFF388E3C),
-        new Button(NativeBridge.BUTTON_L, "L", 0xFF9E9E9E),
-        new Button(NativeBridge.BUTTON_R, "R", 0xFF9E9E9E),
-        new Button(NativeBridge.BUTTON_SELECT, "SELECT", 0xFF757575),
-        new Button(NativeBridge.BUTTON_START, "START", 0xFF757575),
+        new Button(NativeBridge.BUTTON_A, "A", Ui.RED),
+        new Button(NativeBridge.BUTTON_B, "B", Ui.YELLOW),
+        new Button(NativeBridge.BUTTON_X, "X", Ui.BLUE),
+        new Button(NativeBridge.BUTTON_Y, "Y", Ui.GREEN),
+        new Button(NativeBridge.BUTTON_L, "L", Ui.SURFACE_HIGH),
+        new Button(NativeBridge.BUTTON_R, "R", Ui.SURFACE_HIGH),
+        new Button(NativeBridge.BUTTON_SELECT, "SELECT", Ui.SHELL),
+        new Button(NativeBridge.BUTTON_START, "START", Ui.SHELL),
     };
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -156,7 +156,7 @@ public class GamepadView extends View {
 
     private void drawDpad(Canvas canvas) {
         float arm = dpadRadius / 3;
-        fill.setColor(Color.DKGRAY);
+        fill.setColor(Ui.DARK);
         fill.setAlpha(120);
         scratch.set(dpadX - arm, dpadY - dpadRadius, dpadX + arm, dpadY + dpadRadius);
         canvas.drawRoundRect(scratch, arm * 0.3f, arm * 0.3f, fill);

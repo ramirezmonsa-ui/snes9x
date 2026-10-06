@@ -50,6 +50,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Ui.BACKGROUND);
         getWindow().setNavigationBarColor(Ui.BACKGROUND);
+        useDarkSystemBarIcons();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BACKGROUND);
@@ -86,12 +87,21 @@ public class MainActivity extends Activity {
     private void render() {
         content.removeAllViews();
 
-        TextView title = Ui.text(this, getString(R.string.library_title), 32, Ui.TEXT, true);
-        content.addView(title);
-        TextView subtitle = Ui.text(this, getString(R.string.app_name), 14, Ui.ACCENT, true);
+        // Header styled like the controller's logo: four colored dots and
+        // bold italic lettering.
+        LinearLayout brand = new LinearLayout(this);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        brand.addView(Ui.logoDots(this));
+        TextView subtitle = Ui.label(this, getString(R.string.app_name), 14, Ui.TEXT_DIM);
         subtitle.setAllCaps(true);
-        subtitle.setLetterSpacing(0.1f);
-        content.addView(subtitle, 0);
+        subtitle.setLetterSpacing(0.12f);
+        subtitle.setPadding(Ui.dp(this, 4), 0, 0, 0);
+        brand.addView(subtitle);
+        content.addView(brand);
+
+        TextView title = Ui.label(this, getString(R.string.library_title), 36, Ui.TEXT);
+        title.setAllCaps(true);
+        content.addView(title);
 
         if (games.isEmpty()) {
             addButton.setVisibility(View.GONE);
@@ -118,7 +128,9 @@ public class MainActivity extends Activity {
     }
 
     private TextView sectionLabel(String label) {
-        TextView view = Ui.text(this, label, 16, Ui.TEXT, true);
+        TextView view = Ui.label(this, label, 16, Ui.TEXT_DIM);
+        view.setAllCaps(true);
+        view.setLetterSpacing(0.08f);
         view.setPadding(0, Ui.dp(this, 28), 0, Ui.dp(this, 12));
         return view;
     }
@@ -149,20 +161,24 @@ public class MainActivity extends Activity {
         int pad = Ui.dp(this, 22);
         info.setPadding(pad, pad, pad, pad);
 
-        TextView name = Ui.text(this, game.name, 22, 0xFFFFFFFF, true);
+        int textColor = Ui.coverTextColor(game.name);
+        TextView name = Ui.label(this, game.name, 24, textColor);
         name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(name);
-        info.addView(Ui.text(this, lastPlayed(game), 13, 0xCCFFFFFF, false));
+        TextView time = Ui.text(this, lastPlayed(game), 13, textColor, false);
+        time.setAlpha(0.85f);
+        info.addView(time);
 
         LinearLayout pill = new LinearLayout(this);
         pill.setGravity(Gravity.CENTER_VERTICAL);
-        pill.setBackground(Ui.rounded(0xFFFFFFFF, Ui.dp(this, 22)));
+        pill.setBackground(Ui.rounded(Ui.SURFACE, Ui.dp(this, 22)));
+        pill.setElevation(Ui.dp(this, 3));
         pill.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 18), Ui.dp(this, 8));
         ImageView play = new ImageView(this);
-        play.setImageDrawable(Ui.icon(this, R.drawable.ic_play, 0xFF111111));
+        play.setImageDrawable(Ui.icon(this, R.drawable.ic_play, Ui.RED));
         pill.addView(play, new LinearLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22)));
-        TextView playText = Ui.text(this, getString(R.string.play), 15, 0xFF111111, true);
+        TextView playText = Ui.label(this, getString(R.string.play), 16, Ui.TEXT);
         playText.setPadding(Ui.dp(this, 6), 0, 0, 0);
         pill.addView(playText);
         LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(
@@ -223,13 +239,13 @@ public class MainActivity extends Activity {
             return true;
         });
 
-        TextView cover = Ui.text(this, Ui.initials(game.name), 34, 0xFFFFFFFF, true);
+        TextView cover = Ui.label(this, Ui.initials(game.name), 38, Ui.coverTextColor(game.name));
         cover.setGravity(Gravity.CENTER);
         cover.setBackground(Ui.gradient(Ui.coverColors(game.name), Ui.dp(this, 14)));
         card.addView(cover, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 110)));
 
-        TextView name = Ui.text(this, game.name, 15, Ui.TEXT, true);
+        TextView name = Ui.label(this, game.name, 16, Ui.TEXT);
         name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setPadding(Ui.dp(this, 6), Ui.dp(this, 10), Ui.dp(this, 6), 0);
@@ -247,14 +263,33 @@ public class MainActivity extends Activity {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
 
-        ImageView icon = new ImageView(this);
-        icon.setImageDrawable(Ui.icon(this, R.drawable.ic_gamepad, Ui.ACCENT));
-        int iconPad = Ui.dp(this, 26);
-        icon.setPadding(iconPad, iconPad, iconPad, iconPad);
-        icon.setBackground(Ui.rounded(0x268B5CF6, Ui.dp(this, 60)));
-        box.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 120), Ui.dp(this, 120)));
+        // The four face buttons in their diamond layout.
+        int size = Ui.dp(this, 52);
+        FrameLayout buttons = new FrameLayout(this);
+        int[][] layout = {{1, 0}, {2, 1}, {1, 2}, {0, 1}}; // X, A, B, Y
+        int[] colors = {Ui.BLUE, Ui.RED, Ui.YELLOW, Ui.GREEN};
+        String[] letters = {"X", "A", "B", "Y"};
+        for (int i = 0; i < 4; i++) {
+            TextView button = Ui.label(this, letters[i], 20, 0xFFFFFFFF);
+            button.setGravity(Gravity.CENTER);
+            android.graphics.drawable.GradientDrawable circle =
+                    new android.graphics.drawable.GradientDrawable();
+            circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            circle.setColor(colors[i]);
+            button.setBackground(circle);
+            button.setElevation(Ui.dp(this, 4));
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(size, size);
+            params.leftMargin = layout[i][0] * size;
+            params.topMargin = layout[i][1] * size;
+            buttons.addView(button, params);
+        }
+        int shellPad = Ui.dp(this, 10);
+        buttons.setPadding(shellPad, shellPad, shellPad, shellPad);
+        buttons.setBackground(Ui.rounded(Ui.SHELL, size * 2));
+        box.addView(buttons, new LinearLayout.LayoutParams(
+                size * 3 + shellPad * 2, size * 3 + shellPad * 2));
 
-        TextView title = Ui.text(this, getString(R.string.empty_title), 22, Ui.TEXT, true);
+        TextView title = Ui.label(this, getString(R.string.empty_title), 24, Ui.TEXT);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, Ui.dp(this, 24), 0, Ui.dp(this, 8));
         box.addView(title);
@@ -283,7 +318,7 @@ public class MainActivity extends Activity {
         button.setGravity(Gravity.CENTER);
         button.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 24), 0);
         button.setBackground(Ui.selectable(this,
-                Ui.gradient(new int[] {Ui.ACCENT, Ui.ACCENT_DARK}, radius), radius));
+                Ui.gradient(new int[] {0xFFE5434A, 0xFFB51B22}, radius), radius));
         button.setFocusable(true);
         button.setClickable(true);
         button.setOnClickListener(v -> openRom());
@@ -291,7 +326,7 @@ public class MainActivity extends Activity {
         ImageView icon = new ImageView(this);
         icon.setImageDrawable(Ui.icon(this, R.drawable.ic_add, 0xFFFFFFFF));
         button.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
-        TextView label = Ui.text(this, getString(R.string.add_game), 16, 0xFFFFFFFF, true);
+        TextView label = Ui.label(this, getString(R.string.add_game), 17, 0xFFFFFFFF);
         label.setPadding(Ui.dp(this, 8), 0, 0, 0);
         button.addView(label);
         return button;
@@ -309,7 +344,7 @@ public class MainActivity extends Activity {
         new ActionSheet(this)
                 .title(game.name)
                 .subtitle(lastPlayed(game))
-                .action(R.drawable.ic_play, getString(R.string.play), () -> play(game))
+                .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.play), () -> play(game))
                 .danger(R.drawable.ic_delete, getString(R.string.remove_from_library), () -> {
                     games.remove(game);
                     saveGames();
@@ -317,6 +352,24 @@ public class MainActivity extends Activity {
                     Toast.makeText(this, R.string.removed_from_library, Toast.LENGTH_SHORT).show();
                 })
                 .show();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void useDarkSystemBarIcons() {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                int light = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                controller.setSystemBarsAppearance(light, light);
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= 23) {
+            int flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
     }
 
     // --- Controller ------------------------------------------------------------

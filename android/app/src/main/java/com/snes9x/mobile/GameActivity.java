@@ -32,6 +32,7 @@ public class GameActivity extends Activity
         implements SurfaceHolder.Callback, InputManager.InputDeviceListener {
     private EmulatorThread emulator;
     private GamepadView gamepad;
+    private View pauseButton;
     private String gameName;
     private boolean loaded;
 
@@ -63,6 +64,7 @@ public class GameActivity extends Activity
 
         // Pause button at the top, the easiest way to reach the menu.
         ImageView pause = new ImageView(this);
+        pauseButton = pause;
         pause.setImageDrawable(Ui.icon(this, R.drawable.ic_pause, 0xFFFFFFFF));
         int pausePad = Ui.dp(this, 10);
         pause.setPadding(pausePad, pausePad, pausePad, pausePad);
@@ -233,15 +235,15 @@ public class GameActivity extends Activity
         new ActionSheet(this)
                 .title(gameName)
                 .subtitle(getString(R.string.menu_paused))
-                .action(R.drawable.ic_play, getString(R.string.menu_resume), null)
-                .action(R.drawable.ic_save, getString(R.string.menu_save_state),
+                .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.menu_resume), null)
+                .action(Ui.BLUE, R.drawable.ic_save, getString(R.string.menu_save_state),
                         getString(R.string.menu_save_state_detail), this::saveState)
-                .action(R.drawable.ic_history, getString(R.string.menu_load_state), saved,
+                .action(Ui.YELLOW, R.drawable.ic_history, getString(R.string.menu_load_state), saved,
                         this::loadState)
-                .action(R.drawable.ic_gamepad, getString(touchVisible
+                .action(Ui.SHELL, R.drawable.ic_gamepad, getString(touchVisible
                         ? R.string.menu_hide_controls : R.string.menu_show_controls),
-                        () -> gamepad.setVisibility(touchVisible ? View.GONE : View.VISIBLE))
-                .action(R.drawable.ic_refresh, getString(R.string.menu_reset), this::confirmReset)
+                        () -> setTouchControlsVisible(!touchVisible))
+                .action(Ui.DARK, R.drawable.ic_refresh, getString(R.string.menu_reset), this::confirmReset)
                 .danger(R.drawable.ic_exit, getString(R.string.menu_quit), this::finish)
                 .onDismiss(this::onMenuClosed)
                 .show();
@@ -253,9 +255,16 @@ public class GameActivity extends Activity
                 .title(getString(R.string.reset_title))
                 .subtitle(getString(R.string.reset_body))
                 .danger(R.drawable.ic_refresh, getString(R.string.reset_confirm), NativeBridge::reset)
-                .action(R.drawable.ic_play, getString(R.string.cancel), null)
+                .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.cancel), null)
                 .onDismiss(this::onMenuClosed)
                 .show();
+    }
+
+    /** The pause button goes with the touch controls, so nothing covers the game without them. */
+    private void setTouchControlsVisible(boolean visible) {
+        int visibility = visible ? View.VISIBLE : View.GONE;
+        gamepad.setVisibility(visibility);
+        pauseButton.setVisibility(visibility);
     }
 
     private void pauseForMenu() {
@@ -492,7 +501,7 @@ public class GameActivity extends Activity
         }
         if (connected != controllerConnected) {
             controllerConnected = connected;
-            gamepad.setVisibility(connected ? View.GONE : View.VISIBLE);
+            setTouchControlsVisible(!connected);
             if (connected) {
                 Toast.makeText(this, R.string.controller_connected, Toast.LENGTH_SHORT).show();
             }
@@ -502,7 +511,7 @@ public class GameActivity extends Activity
     private void onControllerUsed() {
         if (!controllerConnected) {
             controllerConnected = true;
-            gamepad.setVisibility(View.GONE);
+            setTouchControlsVisible(false);
         }
     }
 
