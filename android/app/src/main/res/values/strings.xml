@@ -40,6 +40,12 @@
     <string name="reset_confirm">Sí, reiniciar</string>
     <string name="cancel">Cancelar</string>
 
+    <string name="crash_title">La app se cerró inesperadamente</string>
+    <string name="crash_body">Copia este reporte y mándaselo a quien te ayuda con la app para que pueda arreglarlo.</string>
+    <string name="crash_copy">Copiar reporte</string>
+    <string name="crash_copied">Reporte copiado</string>
+    <string name="crash_close">Cerrar</string>
+
     <string name="controller_connected">Control conectado: se ocultaron los controles táctiles</string>
     <string name="state_saved">Partida guardada</string>
     <string name="state_save_failed">No se pudo guardar la partida</string>

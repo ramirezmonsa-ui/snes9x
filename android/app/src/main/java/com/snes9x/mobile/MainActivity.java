@@ -80,6 +80,42 @@ public class MainActivity extends Activity {
         super.onResume();
         loadGames();
         render();
+        showLastCrash();
+    }
+
+    /** If the app crashed last time, show what happened so it can be reported. */
+    private void showLastCrash() {
+        java.io.File file = new java.io.File(getFilesDir(), App.CRASH_FILE);
+        if (!file.isFile()) {
+            return;
+        }
+        String report;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+            byte[] data = new byte[(int) file.length()];
+            int length = 0;
+            int n;
+            while (length < data.length && (n = in.read(data, length, data.length - length)) > 0) {
+                length += n;
+            }
+            report = new String(data, 0, length, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            report = e.toString();
+        }
+        file.delete();
+
+        String details = report;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.crash_title)
+                .setMessage(getString(R.string.crash_body) + "\n\n" + details)
+                .setPositiveButton(R.string.crash_copy, (dialog, which) -> {
+                    android.content.ClipboardManager clipboard =
+                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                            getString(R.string.crash_title), details));
+                    Toast.makeText(this, R.string.crash_copied, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(R.string.crash_close, null)
+                .show();
     }
 
     // --- Layout ---------------------------------------------------------------

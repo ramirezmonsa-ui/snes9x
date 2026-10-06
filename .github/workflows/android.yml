@@ -10,6 +10,7 @@ on:
       - 'apu/**'
       - 'filter/**'
       - '.github/workflows/android.yml'
+      - '.github/scripts/android-smoke-test.sh'
   workflow_dispatch:
 
 jobs:
@@ -23,6 +24,14 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # The APK is signed with the debug key. Keeping it in the cache gives
+      # every build the same signature, so new APKs install over old ones.
+      - name: Restore signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
@@ -31,7 +40,46 @@ jobs:
         working-directory: android
         run: gradle --no-daemon assembleRelease
 
+      - name: Show signing certificate
+        run: keytool -printcert -jarfile android/app/build/outputs/apk/release/*.apk | grep -E "SHA256:|Owner"
+
       - uses: actions/upload-artifact@v4
         with:
           name: snes9x-mobile-apk
           path: android/app/build/outputs/apk/release/*.apk
+
+  # Opens the app on an Android emulator to catch crashes before anyone
+  # installs the APK.
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: snes9x-mobile-apk
+          path: android/app/build/outputs/apk/release
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - run: pip install pillow
+
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash .github/scripts/android-smoke-test.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: android-screens/
