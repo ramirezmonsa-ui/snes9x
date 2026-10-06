@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Snes9x Mobile</string>
+    <string name="subtitle">Emulador de Super Nintendo basado en Snes9x</string>
+    <string name="open_rom">Abrir juego (ROM)</string>
+    <string name="recent_games">Juegos recientes</string>
+    <string name="no_recent_games">Todavía no abriste ningún juego.\nAcepta archivos .sfc, .smc y .zip.</string>
+    <string name="no_file_picker">No hay ningún selector de archivos disponible</string>
+    <string name="remove_recent">¿Quitar «%1$s» de la lista?</string>
+    <string name="remove">Quitar</string>
+
+    <string name="error_reading">No se pudo leer el juego: %1$s</string>
+    <string name="error_loading">El archivo no parece ser una ROM de SNES válida</string>
+
+    <string name="menu_resume">Continuar</string>
+    <string name="menu_save_state">Guardar partida (estado)</string>
+    <string name="menu_load_state">Cargar partida (estado)</string>
+    <string name="menu_reset">Reiniciar juego</string>
+    <string name="menu_hide_controls">Ocultar controles táctiles</string>
+    <string name="menu_show_controls">Mostrar controles táctiles</string>
+    <string name="menu_quit">Salir</string>
+
+    <string name="state_saved">Partida guardada</string>
+    <string name="state_save_failed">No se pudo guardar la partida</string>
+    <string name="state_loaded">Partida cargada</string>
+    <string name="state_load_failed">No se pudo cargar la partida</string>
+    <string name="state_missing">Todavía no hay ninguna partida guardada</string>
+</resources>

@@ -1,0 +1,39 @@
+name: Android APK
+
+on:
+  push:
+    paths:
+      - 'android/**'
+      - 'libretro/**'
+      - '*.cpp'
+      - '*.h'
+      - 'apu/**'
+      - 'filter/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Build APK
+        working-directory: android
+        run: gradle --no-daemon assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snes9x-mobile-apk
+          path: android/app/build/outputs/apk/release/*.apk
