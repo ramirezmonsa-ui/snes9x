@@ -2,7 +2,9 @@ package com.snes9x.mobile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.res.Configuration;
+import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -24,7 +26,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 /** Plays the ROM passed in the intent data. */
-public class GameActivity extends Activity implements SurfaceHolder.Callback {
+public class GameActivity extends Activity
+        implements SurfaceHolder.Callback, InputManager.InputDeviceListener {
     private EmulatorThread emulator;
     private GamepadView gamepad;
     private String gameName;
@@ -34,6 +37,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
     private int touchButtons;
     private int keyButtons;
     private int axisButtons;
+    private int triggerButtons;
+
+    private InputManager inputManager;
+    private boolean controllerConnected;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,6 +59,10 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
         root.addView(gamepad);
         setContentView(root);
         hideSystemBars();
+
+        inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
+        inputManager.registerInputDeviceListener(this, null);
+        updateControllerState();
 
         Uri uri = getIntent().getData();
         if (uri == null) {
@@ -118,6 +129,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
 
     @Override
     protected void onDestroy() {
+        inputManager.unregisterInputDeviceListener(this);
         if (emulator != null) {
             emulator.shutdown();
             emulator = null;
@@ -316,7 +328,7 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
     // --- Physical controllers -----------------------------------------------
 
     private void updateButtons() {
-        NativeBridge.setButtons(touchButtons | keyButtons | axisButtons);
+        NativeBridge.setButtons(touchButtons | keyButtons | axisButtons | triggerButtons);
     }
 
     private static int buttonForKey(int keyCode) {
@@ -363,6 +375,9 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
         if (button == 0) {
             return super.dispatchKeyEvent(event);
         }
+        if (isController(event.getDevice())) {
+            onControllerUsed();
+        }
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             keyButtons |= button;
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
@@ -397,7 +412,75 @@ public class GameActivity extends Activity implements SurfaceHolder.Callback {
             buttons |= NativeBridge.BUTTON_DOWN;
         }
         axisButtons = buttons;
+
+        // Analog triggers (L2/R2) act as L and R. Depending on the mode,
+        // controllers report them as the trigger or the brake/gas axes.
+        int triggers = 0;
+        if (Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                event.getAxisValue(MotionEvent.AXIS_BRAKE)) > 0.5f) {
+            triggers |= NativeBridge.BUTTON_L;
+        }
+        if (Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
+                event.getAxisValue(MotionEvent.AXIS_GAS)) > 0.5f) {
+            triggers |= NativeBridge.BUTTON_R;
+        }
+        triggerButtons = triggers;
+
+        if (buttons != 0 || triggers != 0) {
+            onControllerUsed();
+        }
         updateButtons();
         return true;
+    }
+
+    // Touch controls hide by themselves while a controller is plugged in or
+    // paired, and come back when it is disconnected.
+
+    private static boolean isController(InputDevice device) {
+        if (device == null || device.isVirtual()) {
+            return false;
+        }
+        int sources = device.getSources();
+        return (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+                || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
+    }
+
+    private void updateControllerState() {
+        boolean connected = false;
+        for (int id : InputDevice.getDeviceIds()) {
+            if (isController(InputDevice.getDevice(id))) {
+                connected = true;
+                break;
+            }
+        }
+        if (connected != controllerConnected) {
+            controllerConnected = connected;
+            gamepad.setVisibility(connected ? View.GONE : View.VISIBLE);
+            if (connected) {
+                Toast.makeText(this, R.string.controller_connected, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void onControllerUsed() {
+        if (!controllerConnected) {
+            controllerConnected = true;
+            gamepad.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onInputDeviceAdded(int deviceId) {
+        updateControllerState();
+    }
+
+    @Override
+    public void onInputDeviceRemoved(int deviceId) {
+        updateControllerState();
+    }
+
+    @Override
+    public void onInputDeviceChanged(int deviceId) {
+        updateControllerState();
     }
 }

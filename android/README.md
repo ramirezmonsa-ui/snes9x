@@ -17,6 +17,34 @@ juegos de Super Nintendo en el celular.
 En el juego, el botón **Atrás** abre el menú (continuar, guardar o cargar
 partida, reiniciar, ocultar los controles y salir).
 
+## Jugar con un control (por ejemplo EasySMX M15)
+
+Cuando conectas un control, la app lo detecta sola y oculta los botones
+táctiles. Si lo desconectas, vuelven a aparecer.
+
+Con el **EasySMX M15** (se conecta por el puerto USB-C del celular):
+
+1. Pon el control en **modo HID** (mantén **FN + A**; la luz queda amarilla)
+   o en **modo Xbox** (mantén **FN + TURBO**; la luz queda morada). Evita el
+   modo PS, porque en algunos celulares cambia el orden de los botones.
+2. Abre el control, coloca el celular y ciérralo.
+3. Abre un juego en la app.
+
+Los botones funcionan por posición, igual que en el control de SNES:
+
+| Control | SNES |
+|---|---|
+| Botón de abajo (A) | B |
+| Botón de la derecha (B) | A |
+| Botón de la izquierda (X) | Y |
+| Botón de arriba (Y) | X |
+| LB / LT | L |
+| RB / RT | R |
+| Cruceta o palanca izquierda | Cruceta |
+| Start / Menú | Start |
+| Select / View | Select |
+| Home | Abre el menú de la app |
+
 ## Descargar el APK
 
 Cada push que cambie la app la compila automáticamente en GitHub Actions:
