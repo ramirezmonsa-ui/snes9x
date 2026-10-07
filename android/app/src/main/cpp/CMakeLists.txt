@@ -63,6 +63,12 @@ set(CORE_SOURCES
     ${CORE_DIR}/libretro/libretro.cpp
 )
 
+# Newer phones use 16 KB memory pages and can't load native libraries built
+# for 4 KB pages. This applies to every library below, mGBA included.
+if(ANDROID)
+    add_link_options(-Wl,-z,max-page-size=16384)
+endif()
+
 # --- Snes9x (Super Nintendo) -------------------------------------------------
 
 add_library(snes9x_libretro SHARED ${CORE_SOURCES})
