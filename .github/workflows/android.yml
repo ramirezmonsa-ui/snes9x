@@ -28,13 +28,30 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # The APK is signed with the debug key. Keeping it in the cache gives
-      # every build the same signature, so new APKs install over old ones.
+      # Every APK must be signed with the same key, or Android refuses to
+      # install it over the previous one. The key is made on the first build
+      # (with a random password) and kept in this repository's private
+      # Actions cache, never in the code. GitHub drops caches unused for 7
+      # days; after that a new key is made and the app must be reinstalled.
       - name: Restore signing key
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore
+          path: ~/snes9x-signing
+          key: snes9x-signing-v1
+
+      - name: Create signing key if missing
+        run: |
+          dir=~/snes9x-signing
+          if [ ! -f "$dir/app.keystore" ]; then
+            mkdir -p "$dir"
+            openssl rand -hex 24 > "$dir/password"
+            keytool -genkeypair -keystore "$dir/app.keystore" -storetype PKCS12 \
+              -storepass "$(cat "$dir/password")" -alias app -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Snes9x Mobile"
+          fi
+          echo "::add-mask::$(cat "$dir/password")"
+          echo "SIGNING_STORE_FILE=$dir/app.keystore" >> "$GITHUB_ENV"
+          echo "SIGNING_STORE_PASSWORD=$(cat "$dir/password")" >> "$GITHUB_ENV"
 
       - uses: gradle/actions/setup-gradle@v4
         with:

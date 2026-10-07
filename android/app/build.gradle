@@ -18,13 +18,24 @@ android {
         }
     }
 
+    // CI provides a key that stays the same between builds (see
+    // .github/workflows/android.yml). Local builds use the debug key.
+    def ciKeystore = System.getenv('SIGNING_STORE_FILE')
+    signingConfigs {
+        if (ciKeystore) {
+            ci {
+                storeFile file(ciKeystore)
+                storePassword System.getenv('SIGNING_STORE_PASSWORD')
+                keyAlias 'app'
+                keyPassword System.getenv('SIGNING_STORE_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
-            // Signed with the debug key so the APK can be installed directly.
-            // CI keeps that key in its cache so every build has the same
-            // signature and installs over the previous one.
-            signingConfig signingConfigs.debug
+            signingConfig ciKeystore ? signingConfigs.ci : signingConfigs.debug
         }
     }
 
