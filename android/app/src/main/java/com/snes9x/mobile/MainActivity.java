@@ -28,15 +28,17 @@ public class MainActivity extends Activity {
     private static final String PREFS = "recent";
     private static final String KEY_RECENT = "games";
 
-    /** A game in the library, stored as "uri\tname\ttime" lines. */
+    /** A game in the library, stored as "uri\tname\ttime\tconsole" lines. */
     private static final class Game {
         final Uri uri;
         final String name;
+        final Console console;
         long lastPlayed;
 
-        Game(Uri uri, String name, long lastPlayed) {
+        Game(Uri uri, String name, Console console, long lastPlayed) {
             this.uri = uri;
             this.name = name;
+            this.console = console;
             this.lastPlayed = lastPlayed;
         }
     }
@@ -203,9 +205,7 @@ public class MainActivity extends Activity {
         name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(name);
-        TextView time = Ui.text(this, lastPlayed(game), 13, textColor, false);
-        time.setAlpha(0.85f);
-        info.addView(time);
+        info.addView(consoleAndTime(game, 13, textColor, 0.85f));
 
         LinearLayout pill = new LinearLayout(this);
         pill.setGravity(Gravity.CENTER_VERTICAL);
@@ -288,11 +288,30 @@ public class MainActivity extends Activity {
         name.setPadding(Ui.dp(this, 6), Ui.dp(this, 10), Ui.dp(this, 6), 0);
         card.addView(name);
 
-        TextView time = Ui.text(this, lastPlayed(game), 12, Ui.TEXT_DIM, false);
-        time.setSingleLine(true);
-        time.setPadding(Ui.dp(this, 6), Ui.dp(this, 2), Ui.dp(this, 6), 0);
-        card.addView(time);
+        View info = consoleAndTime(game, 12, Ui.TEXT_DIM, 1);
+        info.setPadding(Ui.dp(this, 6), Ui.dp(this, 6), Ui.dp(this, 6), 0);
+        card.addView(info);
         return card;
+    }
+
+    /** The console tag ("SNES", "GBA"...) followed by when it was last played. */
+    private View consoleAndTime(Game game, float sp, int color, float alpha) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tag = Ui.label(this, game.console.label, sp - 2, 0xFFFFFFFF);
+        tag.setLetterSpacing(0.06f);
+        tag.setPadding(Ui.dp(this, 7), Ui.dp(this, 1), Ui.dp(this, 7), Ui.dp(this, 1));
+        tag.setBackground(Ui.rounded(Ui.consoleColor(game.console), Ui.dp(this, 6)));
+        row.addView(tag);
+
+        TextView time = Ui.text(this, lastPlayed(game), sp, color, false);
+        time.setSingleLine(true);
+        time.setEllipsize(TextUtils.TruncateAt.END);
+        time.setAlpha(alpha);
+        time.setPadding(Ui.dp(this, 6), 0, 0, 0);
+        row.addView(time);
+        return row;
     }
 
     private View emptyState() {
@@ -380,7 +399,7 @@ public class MainActivity extends Activity {
     private void showOptions(Game game) {
         new ActionSheet(this)
                 .title(game.name)
-                .subtitle(lastPlayed(game))
+                .subtitle(game.console.label + " · " + lastPlayed(game))
                 .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.play), () -> play(game))
                 .danger(R.drawable.ic_delete, getString(R.string.remove_from_library), () -> {
                     games.remove(game);
@@ -454,7 +473,8 @@ public class MainActivity extends Activity {
         } catch (SecurityException e) {
             // Not persistable; it will still open this time.
         }
-        play(new Game(uri, RomLoader.displayName(getContentResolver(), uri), 0));
+        play(new Game(uri, RomLoader.displayName(getContentResolver(), uri),
+                RomLoader.detect(getContentResolver(), uri), 0));
     }
 
     private void play(Game game) {
@@ -492,7 +512,9 @@ public class MainActivity extends Activity {
                     // Keep 0.
                 }
             }
-            games.add(new Game(Uri.parse(parts[0]), parts[1], time));
+            // Games added before Game Boy support have no console: SNES.
+            Console console = parts.length > 3 ? Console.fromLabel(parts[3]) : Console.SNES;
+            games.add(new Game(Uri.parse(parts[0]), parts[1], console, time));
         }
     }
 
@@ -501,7 +523,8 @@ public class MainActivity extends Activity {
         for (Game game : games) {
             out.append(game.uri).append('\t')
                     .append(game.name.replace('\n', ' ').replace('\t', ' ')).append('\t')
-                    .append(game.lastPlayed).append('\n');
+                    .append(game.lastPlayed).append('\t')
+                    .append(game.console.label).append('\n');
         }
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                 .putString(KEY_RECENT, out.toString()).apply();

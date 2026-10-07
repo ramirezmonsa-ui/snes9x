@@ -8,19 +8,29 @@ import android.provider.OpenableColumns;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /** Reads a ROM picked by the user, unpacking it if it is inside a .zip. */
 final class RomLoader {
-    private static final String[] ROM_EXTENSIONS = {".sfc", ".smc", ".swc", ".fig", ".bs"};
-    private static final int MAX_ROM_SIZE = 16 * 1024 * 1024;
+    // Game Boy Advance games go up to 32MB.
+    private static final int MAX_ROM_SIZE = 32 * 1024 * 1024;
+
+    /** A ROM's contents and the console it is for. */
+    static final class Rom {
+        final byte[] data;
+        final Console console;
+
+        Rom(byte[] data, Console console) {
+            this.data = data;
+            this.console = console;
+        }
+    }
 
     private RomLoader() {
     }
 
-    static byte[] read(ContentResolver resolver, Uri uri) throws IOException {
+    static Rom read(ContentResolver resolver, Uri uri) throws IOException {
         byte[] data;
         try (InputStream in = resolver.openInputStream(uri)) {
             if (in == null) {
@@ -29,15 +39,54 @@ final class RomLoader {
             data = readAll(in);
         }
 
-        // Zip files start with "PK\3\4".
-        if (data.length >= 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4) {
-            data = unzip(data);
+        String name = fileName(resolver, uri);
+        if (isZip(data)) {
+            try (ZipInputStream zip = new ZipInputStream(new java.io.ByteArrayInputStream(data))) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (!entry.isDirectory() && Console.fromFileName(entry.getName()) != null) {
+                        name = entry.getName();
+                        data = readAll(zip);
+                        break;
+                    }
+                }
+            }
+            if (isZip(data)) {
+                throw new IOException("El .zip no contiene ningún juego compatible");
+            }
         }
-        return data;
+
+        Console console = Console.fromFileName(name);
+        return new Rom(data, console != null ? console : Console.fromRom(data));
+    }
+
+    /** The console of a file, looking only at names when possible. */
+    static Console detect(ContentResolver resolver, Uri uri) {
+        Console console = Console.fromFileName(fileName(resolver, uri));
+        if (console != null) {
+            return console;
+        }
+        try {
+            return read(resolver, uri).console;
+        } catch (IOException | RuntimeException e) {
+            return Console.SNES;
+        }
+    }
+
+    private static boolean isZip(byte[] data) {
+        // Zip files start with "PK\3\4".
+        return data.length >= 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4;
     }
 
     /** Display name of the file without its extension, used to name saves. */
     static String displayName(ContentResolver resolver, Uri uri) {
+        String name = fileName(resolver, uri);
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    /** File name with its extension. */
+    static String fileName(ContentResolver resolver, Uri uri) {
         String name = null;
         try (Cursor cursor = resolver.query(uri, new String[] {OpenableColumns.DISPLAY_NAME},
                 null, null, null)) {
@@ -57,33 +106,7 @@ final class RomLoader {
         if (slash >= 0) {
             name = name.substring(slash + 1);
         }
-        int dot = name.lastIndexOf('.');
-        if (dot > 0) {
-            name = name.substring(0, dot);
-        }
         return name;
-    }
-
-    private static byte[] unzip(byte[] zip) throws IOException {
-        try (ZipInputStream in = new ZipInputStream(new java.io.ByteArrayInputStream(zip))) {
-            ZipEntry entry;
-            while ((entry = in.getNextEntry()) != null) {
-                if (!entry.isDirectory() && isRom(entry.getName())) {
-                    return readAll(in);
-                }
-            }
-        }
-        throw new IOException("El .zip no contiene ninguna ROM de SNES");
-    }
-
-    private static boolean isRom(String name) {
-        String lower = name.toLowerCase(Locale.ROOT);
-        for (String ext : ROM_EXTENSIONS) {
-            if (lower.endsWith(ext)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
@@ -93,7 +116,7 @@ final class RomLoader {
         while ((n = in.read(buffer)) > 0) {
             out.write(buffer, 0, n);
             if (out.size() > MAX_ROM_SIZE) {
-                throw new IOException("El archivo es demasiado grande para ser una ROM de SNES");
+                throw new IOException("El archivo es demasiado grande para ser un juego");
             }
         }
         return out.toByteArray();

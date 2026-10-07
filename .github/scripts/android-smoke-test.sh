@@ -71,6 +71,37 @@ sleep 6
 shot game
 alive "abrir un juego"
 
+# A tiny Game Boy Advance ROM that also turns the screen red, to check the
+# switch to the mGBA core.
+python3 - <<'PY'
+import struct
+rom = bytearray(0x200)
+rom[0:4] = struct.pack("<I", 0xEA00002E)          # b 0x080000C0
+rom[0xA0:0xAC] = b"SMOKETEST\0\0\0"
+rom[0xB2] = 0x96
+code = [0xE3A00301, 0xE3A01B01, 0xE2811003, 0xE1C010B0,  # DISPCNT = mode 3, BG2
+        0xE3A00406, 0xE3A0101F, 0xE1811801, 0xE3A02C4B,  # fill VRAM with red
+        0xE4801004, 0xE2522001, 0x1AFFFFFC, 0xEAFFFFFE]
+for i, word in enumerate(code):
+    rom[0xC0 + 4 * i:0xC4 + 4 * i] = struct.pack("<I", word)
+open("smoke.gba", "wb").write(rom)
+PY
+adb push smoke.gba /data/local/tmp/smoke.gba
+adb shell "cp /data/local/tmp/smoke.gba $DIR/smoke.gba && chown \$(stat -c %u /data/data/$PKG):\$(stat -c %g /data/data/$PKG) $DIR/smoke.gba"
+adb shell am start -W -n "$PKG/.GameActivity" -d "file://$DIR/smoke.gba"
+sleep 6
+shot gba
+alive "abrir un juego de GBA"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+
+# Back to the SNES ROM, to check switching cores again.
+adb shell am start -W -n "$PKG/.GameActivity" -d "file://$DIR/smoke.sfc"
+sleep 5
+alive "volver a un juego de SNES"
+
 # Pause menu.
 adb shell input keyevent KEYCODE_BACK
 sleep 2

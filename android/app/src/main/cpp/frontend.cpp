@@ -1,9 +1,11 @@
-// JNI bridge between the Android app and the Snes9x libretro core.
+// JNI bridge between the Android app and the libretro cores (Snes9x for
+// Super Nintendo, mGBA for Game Boy / Game Boy Advance).
 //
-// The core is linked statically into this library, so instead of loading it
-// with dlopen we just call the retro_* functions directly and implement the
-// handful of frontend callbacks the core needs.
+// Each core is its own shared library. They all export the same retro_*
+// functions, so they are opened with dlopen and called through the Core
+// table below. Only one core is loaded at a time.
 
+#include <dlfcn.h>
 #include <jni.h>
 
 #include <cstdarg>
@@ -24,6 +26,34 @@
 #define LOG_TAG "Snes9xBridge"
 
 namespace {
+
+// The retro_* functions of the loaded core.
+struct Core {
+    void *handle = nullptr;
+    std::string name;
+
+    void (*set_environment)(retro_environment_t);
+    void (*set_video_refresh)(retro_video_refresh_t);
+    void (*set_audio_sample)(retro_audio_sample_t);
+    void (*set_audio_sample_batch)(retro_audio_sample_batch_t);
+    void (*set_input_poll)(retro_input_poll_t);
+    void (*set_input_state)(retro_input_state_t);
+    void (*init)(void);
+    void (*deinit)(void);
+    void (*get_system_av_info)(struct retro_system_av_info *);
+    void (*set_controller_port_device)(unsigned, unsigned);
+    void (*reset)(void);
+    void (*run)(void);
+    size_t (*serialize_size)(void);
+    bool (*serialize)(void *, size_t);
+    bool (*unserialize)(const void *, size_t);
+    bool (*load_game)(const struct retro_game_info *);
+    void (*unload_game)(void);
+    void *(*get_memory_data)(unsigned);
+    size_t (*get_memory_size)(unsigned);
+};
+
+Core g_core;
 
 // Largest frame the core can produce (512x478 hi-res interlaced, or the
 // 602 pixel wide NTSC filter output), in RGB565.
@@ -50,7 +80,6 @@ std::vector<int16_t> g_audio;
 // Bitmask of RETRO_DEVICE_ID_JOYPAD_* buttons pressed on player 1.
 volatile int g_buttons = 0;
 
-bool g_initialized = false;
 bool g_game_loaded = false;
 
 void log_message(int prio, const char *fmt, va_list args)
@@ -213,35 +242,110 @@ std::string jstring_to_string(JNIEnv *env, jstring str)
 
 } // namespace
 
+// Opens a core library, first by name (the app's library folder is on the
+// search path from Android 7) and then by full path.
+static void *open_library(const std::string &dir, const std::string &file)
+{
+    void *handle = dlopen(file.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!handle)
+        handle = dlopen((dir + "/" + file).c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!handle)
+        core_log(RETRO_LOG_ERROR, "dlopen %s: %s\n", file.c_str(), dlerror());
+    return handle;
+}
+
+template <typename T>
+static bool find_symbol(void *handle, const char *name, T &out)
+{
+    out = reinterpret_cast<T>(dlsym(handle, name));
+    if (!out)
+        core_log(RETRO_LOG_ERROR, "missing %s\n", name);
+    return out != nullptr;
+}
+
+static void close_core()
+{
+    if (!g_core.handle)
+        return;
+    if (g_game_loaded)
+        g_core.unload_game();
+    g_game_loaded = false;
+    g_core.deinit();
+    dlclose(g_core.handle);
+    g_core = Core();
+    g_options.clear();
+}
+
+static bool open_core(const std::string &dir, const std::string &file)
+{
+    void *handle = open_library(dir, file);
+    if (!handle)
+        return false;
+
+    Core core;
+    core.handle = handle;
+    core.name = file;
+    bool ok = find_symbol(handle, "retro_set_environment", core.set_environment)
+        && find_symbol(handle, "retro_set_video_refresh", core.set_video_refresh)
+        && find_symbol(handle, "retro_set_audio_sample", core.set_audio_sample)
+        && find_symbol(handle, "retro_set_audio_sample_batch", core.set_audio_sample_batch)
+        && find_symbol(handle, "retro_set_input_poll", core.set_input_poll)
+        && find_symbol(handle, "retro_set_input_state", core.set_input_state)
+        && find_symbol(handle, "retro_init", core.init)
+        && find_symbol(handle, "retro_deinit", core.deinit)
+        && find_symbol(handle, "retro_get_system_av_info", core.get_system_av_info)
+        && find_symbol(handle, "retro_set_controller_port_device", core.set_controller_port_device)
+        && find_symbol(handle, "retro_reset", core.reset)
+        && find_symbol(handle, "retro_run", core.run)
+        && find_symbol(handle, "retro_serialize_size", core.serialize_size)
+        && find_symbol(handle, "retro_serialize", core.serialize)
+        && find_symbol(handle, "retro_unserialize", core.unserialize)
+        && find_symbol(handle, "retro_load_game", core.load_game)
+        && find_symbol(handle, "retro_unload_game", core.unload_game)
+        && find_symbol(handle, "retro_get_memory_data", core.get_memory_data)
+        && find_symbol(handle, "retro_get_memory_size", core.get_memory_size);
+    if (!ok)
+    {
+        dlclose(handle);
+        return false;
+    }
+
+    g_core = core;
+    g_core.set_environment(environment);
+    g_core.set_video_refresh(video_refresh);
+    g_core.set_audio_sample(audio_sample);
+    g_core.set_audio_sample_batch(audio_sample_batch);
+    g_core.set_input_poll(input_poll);
+    g_core.set_input_state(input_state);
+    g_core.init();
+    return true;
+}
+
 extern "C" {
 
-JNIEXPORT void JNICALL
-Java_com_snes9x_mobile_NativeBridge_init(JNIEnv *env, jclass, jstring system_dir, jstring save_dir)
+// Makes `core` (a library file name such as "libsnes9x_libretro.so") the
+// active core, switching from the current one if needed.
+JNIEXPORT jboolean JNICALL
+Java_com_snes9x_mobile_NativeBridge_init(JNIEnv *env, jclass, jstring library_dir, jstring core,
+                                         jstring system_dir, jstring save_dir)
 {
     std::lock_guard<std::mutex> guard(g_lock);
-    if (g_initialized)
-        return;
+    std::string file = jstring_to_string(env, core);
+    if (g_core.handle && g_core.name == file)
+        return JNI_TRUE;
 
+    close_core();
     g_system_dir = jstring_to_string(env, system_dir);
     g_save_dir = jstring_to_string(env, save_dir);
-
-    retro_set_environment(environment);
-    retro_set_video_refresh(video_refresh);
-    retro_set_audio_sample(audio_sample);
-    retro_set_audio_sample_batch(audio_sample_batch);
-    retro_set_input_poll(input_poll);
-    retro_set_input_state(input_state);
-    retro_init();
-
-    g_audio.reserve(4096);
-    g_initialized = true;
+    g_audio.reserve(8192);
+    return open_core(jstring_to_string(env, library_dir), file) ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_snes9x_mobile_NativeBridge_loadGame(JNIEnv *env, jclass, jbyteArray rom, jstring name)
 {
     std::lock_guard<std::mutex> guard(g_lock);
-    if (!g_initialized)
+    if (!g_core.handle)
         return JNI_FALSE;
 
     // The core reads the save directory and ROM name from the path; the data
@@ -260,11 +364,11 @@ Java_com_snes9x_mobile_NativeBridge_loadGame(JNIEnv *env, jclass, jbyteArray rom
     info.size = size;
 
     if (g_game_loaded)
-        retro_unload_game();
+        g_core.unload_game();
 
-    g_game_loaded = retro_load_game(&info);
+    g_game_loaded = g_core.load_game(&info);
     if (g_game_loaded)
-        retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+        g_core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
 
     g_frame_ready = false;
     g_audio.clear();
@@ -275,7 +379,9 @@ JNIEXPORT jdouble JNICALL
 Java_com_snes9x_mobile_NativeBridge_getFps(JNIEnv *, jclass)
 {
     struct retro_system_av_info av = {};
-    retro_get_system_av_info(&av);
+    if (!g_core.handle)
+        return 0;
+    g_core.get_system_av_info(&av);
     return av.timing.fps;
 }
 
@@ -283,7 +389,9 @@ JNIEXPORT jint JNICALL
 Java_com_snes9x_mobile_NativeBridge_getSampleRate(JNIEnv *, jclass)
 {
     struct retro_system_av_info av = {};
-    retro_get_system_av_info(&av);
+    if (!g_core.handle)
+        return 0;
+    g_core.get_system_av_info(&av);
     return (jint)av.timing.sample_rate;
 }
 
@@ -291,7 +399,12 @@ JNIEXPORT jfloat JNICALL
 Java_com_snes9x_mobile_NativeBridge_getAspectRatio(JNIEnv *, jclass)
 {
     struct retro_system_av_info av = {};
-    retro_get_system_av_info(&av);
+    if (!g_core.handle)
+        return 0;
+    g_core.get_system_av_info(&av);
+    // 0 means "use the frame size", as the libretro API defines it.
+    if (av.geometry.aspect_ratio <= 0 && av.geometry.base_height > 0)
+        return (jfloat)av.geometry.base_width / av.geometry.base_height;
     return av.geometry.aspect_ratio;
 }
 
@@ -314,7 +427,7 @@ Java_com_snes9x_mobile_NativeBridge_runFrame(JNIEnv *env, jclass, jobject video,
 
     g_audio.clear();
     g_frame_ready = false;
-    retro_run();
+    g_core.run();
 
     jint dims[2] = { 0, 0 };
     if (g_frame_ready)
@@ -345,7 +458,7 @@ Java_com_snes9x_mobile_NativeBridge_reset(JNIEnv *, jclass)
 {
     std::lock_guard<std::mutex> guard(g_lock);
     if (g_game_loaded)
-        retro_reset();
+        g_core.reset();
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -355,11 +468,11 @@ Java_com_snes9x_mobile_NativeBridge_saveState(JNIEnv *env, jclass)
     if (!g_game_loaded)
         return nullptr;
 
-    size_t size = retro_serialize_size();
+    size_t size = g_core.serialize_size();
     if (size == 0)
         return nullptr;
     std::vector<uint8_t> buffer(size);
-    if (!retro_serialize(buffer.data(), size))
+    if (!g_core.serialize(buffer.data(), size))
         return nullptr;
 
     jbyteArray result = env->NewByteArray((jsize)size);
@@ -377,7 +490,7 @@ Java_com_snes9x_mobile_NativeBridge_loadState(JNIEnv *env, jclass, jbyteArray st
     jsize size = env->GetArrayLength(state);
     std::vector<uint8_t> buffer(size);
     env->GetByteArrayRegion(state, 0, size, reinterpret_cast<jbyte *>(buffer.data()));
-    return retro_unserialize(buffer.data(), buffer.size()) ? JNI_TRUE : JNI_FALSE;
+    return g_core.unserialize(buffer.data(), buffer.size()) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Battery-backed cartridge RAM (the in-game save), or null if the cartridge
@@ -389,8 +502,8 @@ Java_com_snes9x_mobile_NativeBridge_getSaveRam(JNIEnv *env, jclass)
     if (!g_game_loaded)
         return nullptr;
 
-    size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    void *data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    size_t size = g_core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
+    void *data = g_core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
     if (size == 0 || !data)
         return nullptr;
 
@@ -406,8 +519,8 @@ Java_com_snes9x_mobile_NativeBridge_setSaveRam(JNIEnv *env, jclass, jbyteArray s
     if (!g_game_loaded || !sram)
         return;
 
-    size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-    void *data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    size_t size = g_core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
+    void *data = g_core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
     if (size == 0 || !data)
         return;
 

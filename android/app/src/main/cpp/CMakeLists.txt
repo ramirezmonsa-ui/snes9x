@@ -63,9 +63,11 @@ set(CORE_SOURCES
     ${CORE_DIR}/libretro/libretro.cpp
 )
 
-add_library(snes9x SHARED ${CORE_SOURCES} snes_bridge.cpp)
+# --- Snes9x (Super Nintendo) -------------------------------------------------
 
-target_include_directories(snes9x PRIVATE
+add_library(snes9x_libretro SHARED ${CORE_SOURCES})
+
+target_include_directories(snes9x_libretro PRIVATE
     ${CORE_DIR}/libretro
     ${CORE_DIR}/libretro/libretro-common/include
     ${CORE_DIR}
@@ -73,24 +75,60 @@ target_include_directories(snes9x PRIVATE
     ${CORE_DIR}/apu/bapu
 )
 
-target_compile_definitions(snes9x PRIVATE
+target_compile_definitions(snes9x_libretro PRIVATE
     __LIBRETRO__
     HAVE_STRINGS_H
     RIGHTSHIFT_IS_SAR
 )
 
-set_target_properties(snes9x PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+set_target_properties(snes9x_libretro PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 # The emulator is unplayable without optimizations, so build it optimized
 # even in debug builds.
-target_compile_options(snes9x PRIVATE -O2 -fno-strict-aliasing -w)
+target_compile_options(snes9x_libretro PRIVATE -O2 -fno-strict-aliasing -w)
+
+# Export only the retro_* functions.
+target_link_options(snes9x_libretro PRIVATE
+    -Wl,--version-script=${CORE_DIR}/libretro/link.T)
 
 if(ANDROID)
-    target_compile_definitions(snes9x PRIVATE ANDROID)
-    target_link_libraries(snes9x log)
+    target_compile_definitions(snes9x_libretro PRIVATE ANDROID)
+endif()
+
+# --- mGBA (Game Boy, Game Boy Color, Game Boy Advance) -----------------------
+
+set(MGBA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/mgba)
+set(BUILD_LIBRETRO ON CACHE BOOL "" FORCE)
+foreach(option BUILD_QT BUILD_SDL BUILD_GL BUILD_GLES2 BUILD_GLES3 USE_EPOXY
+        BUILD_SUITE BUILD_CINEMA BUILD_HEADLESS BUILD_PYTHON BUILD_UPDATER
+        BUILD_EXAMPLE BUILD_PERF BUILD_TEST BUILD_STATIC BUILD_SHARED
+        USE_DEBUGGERS USE_GDB_STUB USE_EDITLINE USE_FFMPEG USE_ZLIB USE_MINIZIP
+        USE_PNG USE_LIBZIP USE_SQLITE3 USE_ELF USE_LUA USE_JSON_C USE_FREETYPE
+        USE_LZMA USE_DISCORD_RPC ENABLE_SCRIPTING)
+    set(${option} OFF CACHE BOOL "" FORCE)
+endforeach()
+set(SKIP_LIBRARY ON CACHE BOOL "" FORCE)
+add_subdirectory(${MGBA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/mgba EXCLUDE_FROM_ALL)
+# mGBA names it "mgba_libretro.so"; Android only packages files named lib*.so.
+set_target_properties(mgba_libretro PROPERTIES PREFIX "lib")
+target_compile_options(mgba_libretro PRIVATE -O2 -w)
+
+# --- Frontend (JNI bridge) ----------------------------------------------------
+
+add_library(frontend SHARED frontend.cpp)
+target_include_directories(frontend PRIVATE ${CORE_DIR}/libretro)
+set_target_properties(frontend PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_options(frontend PRIVATE -O2)
+# The cores are loaded at runtime, but list them as dependencies so they are
+# always built and packaged.
+add_dependencies(frontend snes9x_libretro mgba_libretro)
+target_link_libraries(frontend ${CMAKE_DL_LIBS})
+
+if(ANDROID)
+    target_link_libraries(frontend log)
 else()
-    # Host build, only used to check that everything compiles and links.
+    # Host build, only used to check that everything compiles and works.
     find_package(JNI REQUIRED)
-    target_include_directories(snes9x PRIVATE ${JNI_INCLUDE_DIRS})
-    target_link_options(snes9x PRIVATE -Wl,--no-undefined)
+    target_include_directories(frontend PRIVATE ${JNI_INCLUDE_DIRS})
+    target_link_options(frontend PRIVATE -Wl,--no-undefined)
 endif()

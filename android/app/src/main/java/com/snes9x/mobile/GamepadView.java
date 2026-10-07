@@ -25,6 +25,7 @@ public class GamepadView extends View {
         final int color;
         final RectF bounds = new RectF();
         boolean round;
+        boolean enabled = true;
 
         Button(int mask, String label, int color) {
             this.mask = mask;
@@ -67,6 +68,7 @@ public class GamepadView extends View {
     private float slop;
 
     private int mask;
+    private Console console = Console.SNES;
     private Listener listener;
 
     public GamepadView(Context context) {
@@ -77,6 +79,19 @@ public class GamepadView extends View {
         text.setTextAlign(Paint.Align.CENTER);
         text.setFakeBoldText(true);
         setHapticFeedbackEnabled(true);
+    }
+
+    /** Shows only the buttons the console has, in its layout. */
+    public void setConsole(Console console) {
+        this.console = console;
+        buttons[2].enabled = console.hasXY;
+        buttons[3].enabled = console.hasXY;
+        buttons[4].enabled = console.hasShoulders;
+        buttons[5].enabled = console.hasShoulders;
+        if (getWidth() > 0) {
+            onSizeChanged(getWidth(), getHeight(), getWidth(), getHeight());
+        }
+        invalidate();
     }
 
     public void setListener(Listener listener) {
@@ -99,10 +114,17 @@ public class GamepadView extends View {
         // A on the right, B at the bottom, X at the top, Y on the left.
         float cx = w - margin - clusterRadius - faceRadius;
         float cy = dpadY;
-        setRound(buttons[0], cx + clusterRadius, cy, faceRadius);
-        setRound(buttons[1], cx, cy + clusterRadius, faceRadius);
-        setRound(buttons[2], cx, cy - clusterRadius, faceRadius);
-        setRound(buttons[3], cx - clusterRadius, cy, faceRadius);
+        if (console.hasXY) {
+            setRound(buttons[0], cx + clusterRadius, cy, faceRadius);
+            setRound(buttons[1], cx, cy + clusterRadius, faceRadius);
+            setRound(buttons[2], cx, cy - clusterRadius, faceRadius);
+            setRound(buttons[3], cx - clusterRadius, cy, faceRadius);
+        } else {
+            // Game Boy style: A up and to the right of B, a bit bigger.
+            float big = faceRadius * 1.25f;
+            setRound(buttons[0], cx + clusterRadius * 0.75f, cy - clusterRadius * 0.4f, big);
+            setRound(buttons[1], cx - clusterRadius * 0.75f, cy + clusterRadius * 0.4f, big);
+        }
 
         // Shoulder buttons above each cluster.
         float shoulderWidth = base * 0.28f;
@@ -133,6 +155,9 @@ public class GamepadView extends View {
     protected void onDraw(Canvas canvas) {
         drawDpad(canvas);
         for (Button button : buttons) {
+            if (!button.enabled) {
+                continue;
+            }
             boolean pressed = (mask & button.mask) != 0;
             fill.setColor(button.color);
             fill.setAlpha(pressed ? 230 : 110);
@@ -218,6 +243,9 @@ public class GamepadView extends View {
 
         int hit = 0;
         for (Button button : buttons) {
+            if (!button.enabled) {
+                continue;
+            }
             if (button.contains(x, y, slop)) {
                 hit |= button.mask;
             }

@@ -2,10 +2,10 @@ package com.snes9x.mobile;
 
 import java.nio.ByteBuffer;
 
-/** Thin wrapper over the Snes9x core, see src/main/cpp/snes_bridge.cpp. */
+/** Thin wrapper over the libretro cores, see src/main/cpp/frontend.cpp. */
 public final class NativeBridge {
     static {
-        System.loadLibrary("snes9x");
+        System.loadLibrary("frontend");
     }
 
     /** Largest frame the core can produce, in pixels. */
@@ -29,7 +29,12 @@ public final class NativeBridge {
     private NativeBridge() {
     }
 
-    public static native void init(String systemDir, String saveDir);
+    /**
+     * Makes {@code coreLibrary} (for example "libsnes9x_libretro.so", found in {@code libraryDir})
+     * the active emulator. Returns false if it can't be loaded.
+     */
+    public static native boolean init(String libraryDir, String coreLibrary, String systemDir,
+            String saveDir);
 
     public static native boolean loadGame(byte[] rom, String name);
 

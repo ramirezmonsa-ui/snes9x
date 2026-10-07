@@ -36,6 +36,12 @@ public class GameActivity extends Activity
     private String gameName;
     private boolean loaded;
 
+    // The emulator is shared by the whole app. Each game screen gets a number
+    // when it loads its game, so a screen that is closing late doesn't save
+    // over a game opened after it.
+    private static int latestGame;
+    private int gameNumber;
+
     // Buttons held on the touch screen and on a physical controller.
     private int touchButtons;
     private int keyButtons;
@@ -91,7 +97,7 @@ public class GameActivity extends Activity
         }
 
         gameName = RomLoader.displayName(getContentResolver(), uri);
-        byte[] rom;
+        RomLoader.Rom rom;
         try {
             rom = RomLoader.read(getContentResolver(), uri);
         } catch (IOException | SecurityException e) {
@@ -99,12 +105,18 @@ public class GameActivity extends Activity
             return;
         }
 
-        NativeBridge.init(dir("system").getAbsolutePath(), dir("saves").getAbsolutePath());
-        if (!NativeBridge.loadGame(rom, gameName)) {
+        gamepad.setConsole(rom.console);
+        if (!NativeBridge.init(getApplicationInfo().nativeLibraryDir, rom.console.coreLibrary,
+                dir("system").getAbsolutePath(), dir("saves").getAbsolutePath())) {
+            fail(getString(R.string.error_core));
+            return;
+        }
+        if (!NativeBridge.loadGame(rom.data, gameName)) {
             fail(getString(R.string.error_loading));
             return;
         }
         loaded = true;
+        gameNumber = ++latestGame;
         loadSaveRam();
 
         emulator = new EmulatorThread();
@@ -332,7 +344,7 @@ public class GameActivity extends Activity
     }
 
     private void storeSaveRam() {
-        if (!loaded) {
+        if (!loaded || gameNumber != latestGame) {
             return;
         }
         byte[] sram = NativeBridge.getSaveRam();

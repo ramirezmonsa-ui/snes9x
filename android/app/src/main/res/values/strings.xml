@@ -14,13 +14,14 @@
     <string name="add_game">Agregar juego</string>
     <string name="never_played">Nuevo</string>
     <string name="empty_title">Agrega tu primer juego</string>
-    <string name="empty_body">Elige una ROM de Super Nintendo de tu celular. Sirven los archivos .sfc, .smc y .zip.</string>
+    <string name="empty_body">Elige un juego de tu celular: Super Nintendo (.sfc, .smc), Game Boy Advance (.gba), Game Boy y Game Boy Color (.gb, .gbc). También sirven en .zip.</string>
     <string name="remove_from_library">Quitar de la biblioteca</string>
     <string name="removed_from_library">Juego quitado (el archivo sigue en tu celular)</string>
     <string name="no_file_picker">No hay ningún selector de archivos disponible</string>
 
     <string name="error_reading">No se pudo leer el juego: %1$s</string>
-    <string name="error_loading">El archivo no parece ser una ROM de SNES válida</string>
+    <string name="error_loading">El archivo no parece ser un juego válido</string>
+    <string name="error_core">No se pudo iniciar el emulador para este juego</string>
 
     <!-- In-game menu -->
     <string name="menu_paused">Juego en pausa</string>

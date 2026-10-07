@@ -65,6 +65,16 @@ final class Ui {
         return COVERS[Math.abs(name.hashCode() % COVERS.length)];
     }
 
+    /** Color of the console tag on game cards. */
+    static int consoleColor(Console console) {
+        switch (console) {
+            case GBA: return 0xFF4C3FA8;   // the indigo of the original GBA
+            case GBC: return 0xFF0E8A8A;
+            case GB: return 0xFF6B7A2E;    // the green of the original screen
+            default: return DARK;
+        }
+    }
+
     /** White reads poorly on the yellow cover, so that one gets dark text. */
     static int coverTextColor(String name) {
         return coverColors(name) == COVERS[1] ? 0xFF3B2A00 : 0xFFFFFFFF;

@@ -16,3 +16,6 @@
 [submodule "external/cubeb"]
 	path = external/cubeb
 	url = https://github.com/mozilla/cubeb.git
+[submodule "android/third_party/mgba"]
+	path = android/third_party/mgba
+	url = https://github.com/mgba-emu/mgba.git

@@ -1,12 +1,14 @@
 # Snes9x Mobile (Android)
 
-App de Android que usa el núcleo de Snes9x de este repositorio para jugar
-juegos de Super Nintendo en el celular.
+App de Android para jugar juegos de **Super Nintendo** (con el núcleo de
+Snes9x de este repositorio) y de **Game Boy Advance, Game Boy y Game Boy
+Color** (con [mGBA](https://mgba.io), en `third_party/mgba`).
 
 ## Qué hace
 
-- Abre ROMs `.sfc`, `.smc`, `.swc`, `.fig` y `.zip` con el selector de
-  archivos de Android (no pide permisos de almacenamiento).
+- Abre juegos `.sfc`, `.smc`, `.gba`, `.gb`, `.gbc` (también dentro de un
+  `.zip`) con el selector de archivos de Android, sin pedir permisos de
+  almacenamiento. La consola se detecta sola y se indica en cada juego.
 - Biblioteca con tarjetas de color, y un acceso directo a "Seguir jugando"
   con el último juego (mantén presionado un juego para quitarlo).
 - Controles táctiles: cruceta, A/B/X/Y, L/R, Start y Select.
@@ -61,6 +63,8 @@ Cada push que cambie la app la compila automáticamente en GitHub Actions:
 
 ## Compilar en tu computadora
 
+(Primero trae mGBA, ver "Para compilar" más abajo.)
+
 Necesitas Android Studio (que trae el SDK, el NDK y CMake). Abre la carpeta
 `android/` como proyecto y dale a *Run*, o desde la terminal:
 
@@ -75,8 +79,9 @@ El APK queda en `android/app/build/outputs/apk/release/`.
 
 | Archivo | Qué hace |
 |---|---|
-| `app/src/main/cpp/CMakeLists.txt` | Compila el núcleo de Snes9x (`libretro/`) junto con el puente. |
-| `app/src/main/cpp/snes_bridge.cpp` | Puente JNI: conecta el núcleo libretro con Java (video, audio, botones, partidas). |
+| `app/src/main/cpp/CMakeLists.txt` | Compila los dos emuladores (Snes9x y mGBA) y el puente. |
+| `app/src/main/cpp/frontend.cpp` | Puente JNI: carga el emulador que toca y lo conecta con Java (video, audio, botones, partidas). |
+| `Console.java` | Las consolas, qué emulador usa cada una y cómo reconocer sus juegos. |
 | `NativeBridge.java` | Las funciones nativas vistas desde Java. |
 | `EmulatorThread.java` | Hilo que corre el emulador, dibuja cada cuadro y reproduce el audio. |
 | `GamepadView.java` | El control táctil en pantalla. |
@@ -86,10 +91,19 @@ El APK queda en `android/app/build/outputs/apk/release/`.
 | `Ui.java` | Colores y estilos compartidos. |
 | `RomLoader.java` | Lee la ROM (y la saca del `.zip` si hace falta). |
 
+## Para compilar
+
+mGBA es un submódulo de git. Después de clonar el repositorio:
+
+```sh
+git submodule update --init android/third_party/mgba
+```
+
 ## Aviso
 
 - Usa solo ROMs de juegos que tengas.
 - Snes9x **no permite uso comercial** (ver `LICENSE` en la raíz): puedes
   compartir la app gratis, pero no venderla.
+- mGBA usa la licencia MPL 2.0 (ver `third_party/mgba/LICENSE`).
 - El APK se firma con la clave de depuración para poder instalarlo directo.
   Si algún día la publicas, crea tu propia clave de firma.
