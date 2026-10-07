@@ -80,6 +80,24 @@ jobs:
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/*.apk | grep -i "SHA-256"
 
+      # Checks that phones are strict about but the emulator test isn't.
+      - name: Inspect APK
+        run: |
+          APK=$(ls android/app/build/outputs/apk/release/*.apk)
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          ls -l "$APK"
+          "$BT"aapt2 dump badging "$APK" | grep -E "^package|sdkVersion|native-code" || true
+          echo "--- zip alignment (16 KB) ---"
+          "$BT"zipalign -c -P 16 -v 4 "$APK" | grep -E "\.so|Verification" || true
+          echo "--- native libraries ---"
+          unzip -lv "$APK" | grep "\.so" || true
+          mkdir -p so && unzip -o -q "$APK" 'lib/*' -d so
+          READELF=$(ls "$ANDROID_HOME"/ndk/*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf | tail -1)
+          for f in so/lib/*/*.so; do
+            echo "$f: $("$READELF" -lW "$f" | awk '/LOAD/ {print $NF}' | sort -u | tr '\n' ' ')"
+            "$READELF" -dW "$f" | grep NEEDED | sed 's/^/    /'
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: snes9x-mobile-apk
