@@ -29,17 +29,30 @@ jobs:
           java-version: 17
 
       # Every APK must be signed with the same key, or Android refuses to
-      # install it over the previous one. The key is made on the first build
-      # (with a random password) and kept in this repository's private
-      # Actions cache, never in the code. GitHub drops caches unused for 7
-      # days; after that a new key is made and the app must be reinstalled.
+      # install it over the previous one. The key lives in the repository
+      # secrets SIGNING_KEYSTORE_BASE64 and SIGNING_STORE_PASSWORD. Without
+      # them, a key is made on the first build and kept in the private
+      # Actions cache instead (GitHub drops it after 7 days unused).
+      - name: Use signing key from secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          mkdir -p ~/snes9x-signing
+          echo "$KEYSTORE_BASE64" | base64 -d > ~/snes9x-signing/secret.keystore
+          echo "SIGNING_STORE_FILE=$HOME/snes9x-signing/secret.keystore" >> "$GITHUB_ENV"
+          echo "SIGNING_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Restore signing key
+        if: env.SIGNING_STORE_FILE == ''
         uses: actions/cache@v4
         with:
           path: ~/snes9x-signing
           key: snes9x-signing-v1
 
       - name: Create signing key if missing
+        if: env.SIGNING_STORE_FILE == ''
         run: |
           dir=~/snes9x-signing
           if [ ! -f "$dir/app.keystore" ]; then
