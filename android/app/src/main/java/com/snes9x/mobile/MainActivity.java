@@ -50,7 +50,6 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Ui.BACKGROUND);
         getWindow().setNavigationBarColor(Ui.BACKGROUND);
-        useDarkSystemBarIcons();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BACKGROUND);
@@ -73,6 +72,8 @@ public class MainActivity extends Activity {
         root.addView(addButton, params);
 
         setContentView(root);
+        // Needs the window's views, so only after setContentView.
+        useDarkSystemBarIcons();
     }
 
     @Override
