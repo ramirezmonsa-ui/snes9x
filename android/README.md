@@ -52,14 +52,15 @@ Los botones funcionan por posición, igual que en el control de SNES:
 
 ## Descargar el APK
 
-Cada push que cambie la app la compila automáticamente en GitHub Actions:
+La última versión, sin necesidad de cuenta de GitHub:
 
-1. En GitHub, ve a la pestaña **Actions** del repositorio y abre la última
-   ejecución de **Android APK** que esté en verde.
-2. Abajo, en **Artifacts**, descarga `snes9x-mobile-apk` (es un `.zip` con el
-   APK dentro).
-3. Pasa el APK al celular, ábrelo y permite "instalar apps de origen
-   desconocido" cuando Android lo pida.
+**https://github.com/ramirezmonsa-ui/snes9x/releases/latest**
+
+Descarga `snes9x-mobile.apk`, ábrelo y permite "instalar apps de origen
+desconocido" cuando Android lo pida.
+
+Cada cambio en la app se compila en GitHub Actions, se prueba en un Android
+virtual y, si pasa la prueba, se publica ahí solo.
 
 ## Compilar en tu computadora
 
