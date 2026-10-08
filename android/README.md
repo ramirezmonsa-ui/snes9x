@@ -42,7 +42,17 @@ Con el **EasySMX M15** (se conecta por el puerto USB-C del celular):
 2. Abre el control, coloca el celular y ciérralo.
 3. Abre un juego en la app.
 
-Los botones funcionan por posición, igual que en el control de SNES:
+Cada botón se puede cambiar en **Configurar control** (botón "Control" en la
+pantalla de inicio, o en el menú de pausa): tocas una acción y presionas el
+botón que quieras.
+
+**Botones traseros M1/M2 de la EasySMX M15:** no mandan nada por sí solos,
+hay que programarlos en el control para que copien otro botón. Mantén
+**FN + M1** dos segundos, aprieta la palanca izquierda (**L3**) y toca **M1**
+otra vez; lo mismo con **M2** y la palanca derecha (**R3**). En la app, L3
+rebobina y R3 es avance rápido (se puede cambiar).
+
+De fábrica, los botones funcionan por posición, igual que en el control de SNES:
 
 | Control | SNES |
 |---|---|
@@ -52,8 +62,8 @@ Los botones funcionan por posición, igual que en el control de SNES:
 | Botón de arriba (Y) | X |
 | LB | L |
 | RB | R |
-| LT (L2) | Rebobinar (mantener) |
-| RT (R2) | Avance rápido (prender/apagar) |
+| LT (L2) o L3 | Rebobinar (mantener) |
+| RT (R2) o R3 | Avance rápido (prender/apagar) |
 | Cruceta o palanca izquierda | Cruceta |
 | Start / Menú | Start |
 | Select / View | Select |

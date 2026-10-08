@@ -106,12 +106,12 @@ alive "volver a un juego de SNES"
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 
-# Fast-forward (Tab toggles it like R2) and rewind (Backspace, like L2).
-adb shell input keyevent KEYCODE_TAB
+# Fast-forward (R2 turns it on and off) and rewind (hold L2).
+adb shell input keyevent KEYCODE_BUTTON_R2
 sleep 2
 shot fast_forward
-adb shell input keyevent KEYCODE_TAB
-adb shell input keyevent --longpress KEYCODE_DEL
+adb shell input keyevent KEYCODE_BUTTON_R2
+adb shell input keyevent --longpress KEYCODE_BUTTON_L2
 sleep 1
 alive "avance rápido y rebobinar"
 
@@ -124,6 +124,17 @@ adb shell input keyevent KEYCODE_ENTER
 sleep 2
 shot slots
 alive "abrir las partidas guardadas"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+
+# Controller setup, the fifth item of the pause menu.
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+for i in 1 2 3 4 5; do adb shell input keyevent KEYCODE_DPAD_DOWN; done
+adb shell input keyevent KEYCODE_ENTER
+sleep 2
+shot controls
+alive "abrir la configuración del control"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 

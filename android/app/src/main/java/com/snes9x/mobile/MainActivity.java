@@ -135,8 +135,11 @@ public class MainActivity extends Activity {
         subtitle.setAllCaps(true);
         subtitle.setLetterSpacing(0.12f);
         subtitle.setPadding(Ui.dp(this, 4), 0, 0, 0);
-        brand.addView(subtitle);
-        content.addView(brand);
+        brand.addView(subtitle, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        brand.addView(controlsButton());
+        content.addView(brand, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = Ui.label(this, getString(R.string.library_title), 36, Ui.TEXT);
         title.setAllCaps(true);
@@ -164,6 +167,26 @@ public class MainActivity extends Activity {
         content.addView(hint);
 
         hero.requestFocus();
+    }
+
+    /** Opens "Configurar control", to choose what each controller button does. */
+    private View controlsButton() {
+        float radius = Ui.dp(this, 20);
+        LinearLayout button = new LinearLayout(this);
+        button.setGravity(Gravity.CENTER_VERTICAL);
+        button.setPadding(Ui.dp(this, 10), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+        button.setBackground(Ui.selectable(this, Ui.rounded(Ui.SURFACE, radius), radius));
+        button.setFocusable(true);
+        button.setClickable(true);
+        button.setContentDescription(getString(R.string.controls_title));
+        button.setOnClickListener(v -> new ControlsDialog(this, new ControllerMapping(this)).show());
+        ImageView icon = new ImageView(this);
+        icon.setImageDrawable(Ui.icon(this, R.drawable.ic_gamepad, Ui.TEXT));
+        button.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22)));
+        TextView label = Ui.label(this, getString(R.string.controls_short), 13, Ui.TEXT);
+        label.setPadding(Ui.dp(this, 6), 0, 0, 0);
+        button.addView(label);
+        return button;
     }
 
     private TextView sectionLabel(String label) {

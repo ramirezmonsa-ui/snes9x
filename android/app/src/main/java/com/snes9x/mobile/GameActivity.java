@@ -63,8 +63,10 @@ public class GameActivity extends Activity
     // Some controllers send them as keys, others as axes, some as both; once
     // keys are seen the axes are ignored so a press doesn't count twice.
     private boolean triggerKeysSeen;
-    private boolean fastForwardTriggerDown;
+    private boolean leftTriggerDown;
+    private boolean rightTriggerDown;
     private boolean rewindHeld;
+    private ControllerMapping mapping;
 
     private InputManager inputManager;
     private boolean controllerConnected;
@@ -125,6 +127,7 @@ public class GameActivity extends Activity
         setContentView(root);
         hideSystemBars();
 
+        mapping = new ControllerMapping(this);
         inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(this, null);
         updateControllerState();
@@ -230,6 +233,8 @@ public class GameActivity extends Activity
         button.setBackground(Ui.rounded(0x66000000, Ui.dp(this, 22)));
         button.setAlpha(0.85f);
         button.setContentDescription(getString(description));
+        // Only for touch: controller and keyboard keys go to the game.
+        button.setFocusable(false);
         return button;
     }
 
@@ -394,6 +399,8 @@ public class GameActivity extends Activity
                 .action(Ui.SHELL, R.drawable.ic_gamepad, getString(touchVisible
                         ? R.string.menu_hide_controls : R.string.menu_show_controls),
                         () -> setTouchControlsVisible(!touchVisible))
+                .action(Ui.SHELL, R.drawable.ic_gamepad, getString(R.string.controls_title),
+                        getString(R.string.controls_menu_detail), this::showControls)
                 .action(Ui.DARK, R.drawable.ic_refresh, getString(R.string.menu_reset), this::confirmReset)
                 .danger(R.drawable.ic_exit, getString(R.string.menu_quit), this::finish)
                 .onDismiss(this::onMenuClosed)
@@ -418,6 +425,13 @@ public class GameActivity extends Activity
         rewindButton.setVisibility(visibility);
         pauseButton.setVisibility(visibility);
         fastForwardButton.setVisibility(visibility);
+    }
+
+    private void showControls() {
+        pauseForMenu();
+        ControlsDialog dialog = new ControlsDialog(this, mapping);
+        dialog.setOnDismissListener(d -> onMenuClosed());
+        dialog.show();
     }
 
     // --- Screen filter ------------------------------------------------------
@@ -587,31 +601,12 @@ public class GameActivity extends Activity
         NativeBridge.setButtons(touchButtons | keyButtons | axisButtons);
     }
 
-    private static int buttonForKey(int keyCode) {
+    private static int dpadButton(int keyCode) {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_UP: return NativeBridge.BUTTON_UP;
             case KeyEvent.KEYCODE_DPAD_DOWN: return NativeBridge.BUTTON_DOWN;
             case KeyEvent.KEYCODE_DPAD_LEFT: return NativeBridge.BUTTON_LEFT;
             case KeyEvent.KEYCODE_DPAD_RIGHT: return NativeBridge.BUTTON_RIGHT;
-            // Android names the buttons by position like an Xbox pad, the SNES
-            // has A on the right and B at the bottom.
-            case KeyEvent.KEYCODE_BUTTON_A: return NativeBridge.BUTTON_B;
-            case KeyEvent.KEYCODE_BUTTON_B: return NativeBridge.BUTTON_A;
-            case KeyEvent.KEYCODE_BUTTON_X: return NativeBridge.BUTTON_Y;
-            case KeyEvent.KEYCODE_BUTTON_Y: return NativeBridge.BUTTON_X;
-            case KeyEvent.KEYCODE_BUTTON_L1: return NativeBridge.BUTTON_L;
-            case KeyEvent.KEYCODE_BUTTON_R1: return NativeBridge.BUTTON_R;
-            case KeyEvent.KEYCODE_BUTTON_START: return NativeBridge.BUTTON_START;
-            case KeyEvent.KEYCODE_BUTTON_SELECT: return NativeBridge.BUTTON_SELECT;
-            // Keyboard, handy on Chromebooks and with the emulator.
-            case KeyEvent.KEYCODE_X: return NativeBridge.BUTTON_A;
-            case KeyEvent.KEYCODE_Z: return NativeBridge.BUTTON_B;
-            case KeyEvent.KEYCODE_S: return NativeBridge.BUTTON_X;
-            case KeyEvent.KEYCODE_A: return NativeBridge.BUTTON_Y;
-            case KeyEvent.KEYCODE_Q: return NativeBridge.BUTTON_L;
-            case KeyEvent.KEYCODE_W: return NativeBridge.BUTTON_R;
-            case KeyEvent.KEYCODE_ENTER: return NativeBridge.BUTTON_START;
-            case KeyEvent.KEYCODE_SPACE: return NativeBridge.BUTTON_SELECT;
             default: return 0;
         }
     }
@@ -619,43 +614,65 @@ public class GameActivity extends Activity
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_MODE) {
-            if (event.getAction() == KeyEvent.ACTION_UP) {
-                showMenu();
-            }
-            return true;
-        }
-        // R2 (or Tab) toggles fast-forward, L2 (or Backspace) rewinds while held.
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_R2 || keyCode == KeyEvent.KEYCODE_TAB) {
-            triggerKeysSeen |= keyCode == KeyEvent.KEYCODE_BUTTON_R2;
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                toggleFastForward();
-            }
-            return true;
-        }
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_L2 || keyCode == KeyEvent.KEYCODE_DEL) {
-            triggerKeysSeen |= keyCode == KeyEvent.KEYCODE_BUTTON_L2;
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                setRewinding(true);
-            } else if (event.getAction() == KeyEvent.ACTION_UP) {
-                setRewinding(false);
-            }
-            return true;
-        }
-        int button = buttonForKey(keyCode);
-        if (button == 0) {
+        int action = event.getAction();
+        if (action != KeyEvent.ACTION_DOWN && action != KeyEvent.ACTION_UP) {
             return super.dispatchKeyEvent(event);
+        }
+        boolean down = action == KeyEvent.ACTION_DOWN;
+
+        int dpad = dpadButton(keyCode);
+        if (dpad != 0) {
+            pressKey(dpad, down);
+            if (isController(event.getDevice())) {
+                onControllerUsed();
+            }
+            return true;
+        }
+        ControllerMapping.Action mapped = mapping.get(keyCode);
+        if (mapped == null) {
+            return super.dispatchKeyEvent(event);
+        }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_L2 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
+            triggerKeysSeen = true;
         }
         if (isController(event.getDevice())) {
             onControllerUsed();
         }
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            keyButtons |= button;
-        } else if (event.getAction() == KeyEvent.ACTION_UP) {
-            keyButtons &= ~button;
+        if (!down || event.getRepeatCount() == 0) {
+            runAction(mapped, down);
+        }
+        return true;
+    }
+
+    /** Does what a button is set to do, on press ({@code down}) or release. */
+    private void runAction(ControllerMapping.Action action, boolean down) {
+        switch (action) {
+            case FAST_FORWARD:
+                if (down) {
+                    toggleFastForward();
+                }
+                break;
+            case REWIND:
+                setRewinding(down);
+                break;
+            case MENU:
+                if (!down) {
+                    showMenu();
+                }
+                break;
+            default:
+                pressKey(action.mask, down);
+                break;
+        }
+    }
+
+    private void pressKey(int mask, boolean down) {
+        if (down) {
+            keyButtons |= mask;
+        } else {
+            keyButtons &= ~mask;
         }
         updateButtons();
-        return true;
     }
 
     @Override
@@ -684,34 +701,35 @@ public class GameActivity extends Activity
         }
         axisButtons = buttons;
 
-        // Analog triggers. Depending on the mode, controllers report them
-        // as the trigger or the brake/gas axes.
-        boolean triggerUsed = false;
+        // Analog triggers act like the LT and RT keys, so they follow the
+        // same assignments. Depending on the mode, controllers report them as
+        // the trigger or the brake/gas axes.
         if (!triggerKeysSeen) {
             float left = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
                     event.getAxisValue(MotionEvent.AXIS_BRAKE));
             float right = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
                     event.getAxisValue(MotionEvent.AXIS_GAS));
-            if (left > 0.5f) {
-                setRewinding(true);
-                triggerUsed = true;
-            } else if (left < 0.3f && rewindHeld) {
-                setRewinding(false);
-            }
-            if (right > 0.5f && !fastForwardTriggerDown) {
-                fastForwardTriggerDown = true;
-                toggleFastForward();
-                triggerUsed = true;
-            } else if (right < 0.3f) {
-                fastForwardTriggerDown = false;
-            }
+            leftTriggerDown = analogTrigger(KeyEvent.KEYCODE_BUTTON_L2, left, leftTriggerDown);
+            rightTriggerDown = analogTrigger(KeyEvent.KEYCODE_BUTTON_R2, right, rightTriggerDown);
         }
 
-        if (buttons != 0 || triggerUsed) {
+        if (buttons != 0 || leftTriggerDown || rightTriggerDown) {
             onControllerUsed();
         }
         updateButtons();
         return true;
+    }
+
+    /** Turns an analog trigger into presses and releases, with some hysteresis. */
+    private boolean analogTrigger(int keyCode, float value, boolean wasDown) {
+        boolean down = wasDown ? value > 0.3f : value > 0.5f;
+        if (down != wasDown) {
+            ControllerMapping.Action mapped = mapping.get(keyCode);
+            if (mapped != null) {
+                runAction(mapped, down);
+            }
+        }
+        return down;
     }
 
     // Touch controls hide by themselves while a controller is plugged in or

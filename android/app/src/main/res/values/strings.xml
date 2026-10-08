@@ -41,6 +41,22 @@
     <string name="badge_fast_forward">⏩ x3</string>
     <string name="badge_rewind">⏪ Rebobinando</string>
 
+    <!-- Controller buttons -->
+    <string name="controls_title">Configurar control</string>
+    <string name="controls_short">Control</string>
+    <string name="controls_menu_detail">Elegir qué hace cada botón</string>
+    <string name="controls_hint">Toca una acción y después presiona el botón del control que quieras usar.</string>
+    <string name="controls_listening">Presiona el botón para «%1$s». Atrás para cancelar.</string>
+    <string name="controls_paddles">¿Botones traseros (M1/M2)? Primero prográmalos en el control para que copien otro botón. En la EasySMX M15: mantén FN + M1 dos segundos, aprieta la palanca izquierda (L3) y vuelve a tocar M1. Haz lo mismo con M2 y la palanca derecha (R3). Ya vienen asignados: L3 rebobina y R3 es avance rápido.</string>
+    <string name="controls_press">Presiona un botón…</string>
+    <string name="controls_none">Sin asignar</string>
+    <string name="controls_reset">Restablecer</string>
+    <string name="controls_done">Listo</string>
+    <string name="controls_menu">Abrir el menú</string>
+    <string name="controls_button">Botón %1$s</string>
+    <string name="key_numbered">Botón %1$d</string>
+    <string name="key_keyboard">Tecla %1$s</string>
+
     <!-- Save slots -->
     <string name="slots_title">Partidas guardadas</string>
     <string name="slots_hint">Toca un espacio para guardar o cargar</string>
