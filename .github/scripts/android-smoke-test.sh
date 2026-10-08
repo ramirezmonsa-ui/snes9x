@@ -130,7 +130,7 @@ sleep 1
 # Controller setup, the fifth item of the pause menu.
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-for i in 1 2 3 4 5; do adb shell input keyevent KEYCODE_DPAD_DOWN; done
+for i in 1 2 3 4; do adb shell input keyevent KEYCODE_DPAD_DOWN; done
 adb shell input keyevent KEYCODE_ENTER
 sleep 2
 shot controls

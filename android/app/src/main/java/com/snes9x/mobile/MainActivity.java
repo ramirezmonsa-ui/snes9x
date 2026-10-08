@@ -454,7 +454,14 @@ public class MainActivity extends Activity {
     // --- Controller ------------------------------------------------------------
 
     @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        Ui.keyNavigation = false;
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        Ui.keyNavigation = true;
         // The controller's A button presses whatever is selected.
         if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_A) {
             if (event.getAction() == KeyEvent.ACTION_UP) {

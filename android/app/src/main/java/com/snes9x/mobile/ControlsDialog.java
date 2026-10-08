@@ -95,7 +95,7 @@ final class ControlsDialog extends Dialog {
             window.setGravity(Gravity.CENTER);
         }
         if (list.getChildCount() > 0) {
-            list.getChildAt(0).requestFocus();
+            Ui.focusForKeys(list.getChildAt(0));
         }
     }
 

@@ -39,7 +39,22 @@ final class Ui {
         {0xFF2DB062, 0xFF117236},
     };
 
+    /**
+     * True while the player uses a controller or keyboard rather than touch. Dialogs then start
+     * with their first item selected, so the d-pad moves from there right away.
+     */
+    static boolean keyNavigation;
+
     private Ui() {
+    }
+
+    /** Selects {@code view} if the player is navigating with keys. */
+    static void focusForKeys(android.view.View view) {
+        if (keyNavigation) {
+            view.requestFocusFromTouch();
+        } else {
+            view.requestFocus();
+        }
     }
 
     static int dp(Context context, float value) {

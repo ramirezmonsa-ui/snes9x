@@ -104,7 +104,7 @@ final class SlotsDialog {
             window.setGravity(Gravity.CENTER);
         }
         if (first != null) {
-            first.requestFocus();
+            Ui.focusForKeys(first);
         }
     }
 

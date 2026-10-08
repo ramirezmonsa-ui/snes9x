@@ -149,7 +149,7 @@ final class ActionSheet {
             window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         if (first != null) {
-            first.requestFocus();
+            Ui.focusForKeys(first);
         }
         return dialog;
     }

@@ -612,7 +612,14 @@ public class GameActivity extends Activity
     }
 
     @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        Ui.keyNavigation = false;
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        Ui.keyNavigation = true;
         int keyCode = event.getKeyCode();
         int action = event.getAction();
         if (action != KeyEvent.ACTION_DOWN && action != KeyEvent.ACTION_UP) {
