@@ -23,7 +23,6 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,7 +34,7 @@ public class GameActivity extends Activity
         implements SurfaceHolder.Callback, InputManager.InputDeviceListener {
     private EmulatorThread emulator;
     private GamepadView gamepad;
-    private View topBar;
+    private ImageView pauseButton;
     private ImageView fastForwardButton;
     private ImageView rewindButton;
     private TextView speedBadge;
@@ -43,6 +42,7 @@ public class GameActivity extends Activity
     private boolean loaded;
     private SaveSlots slots;
     private SharedPreferences prefs;
+    private float gameAspect = 4f / 3f;
 
     // The automatic save is only written once the player has decided whether
     // to continue from the previous one, so it isn't overwritten by mistake.
@@ -86,10 +86,8 @@ public class GameActivity extends Activity
         });
         root.addView(gamepad);
 
-        // Rewind, pause and fast-forward at the top. They hide with the touch
-        // controls, so nothing covers the game when playing with a controller.
-        LinearLayout bar = new LinearLayout(this);
-        topBar = bar;
+        // Rewind, pause and fast-forward. They go next to the picture, never
+        // over it (see placeTopButtons), and hide with the touch controls.
         rewindButton = topButton(R.drawable.ic_fast_rewind, R.string.rewind);
         rewindButton.setOnTouchListener((v, event) -> {
             int action = event.getActionMasked();
@@ -100,22 +98,16 @@ public class GameActivity extends Activity
             }
             return true;
         });
-        ImageView pause = topButton(R.drawable.ic_pause, R.string.menu_paused);
-        pause.setOnClickListener(v -> showMenu());
+        pauseButton = topButton(R.drawable.ic_pause, R.string.menu_paused);
+        pauseButton.setOnClickListener(v -> showMenu());
         fastForwardButton = topButton(R.drawable.ic_fast_forward, R.string.fast_forward);
         fastForwardButton.setOnClickListener(v -> toggleFastForward());
         int size = Ui.dp(this, 44);
-        int gap = Ui.dp(this, 18);
-        for (ImageView button : new ImageView[] {rewindButton, pause, fastForwardButton}) {
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
-            params.leftMargin = button == rewindButton ? 0 : gap;
-            bar.addView(button, params);
+        for (ImageView button : new ImageView[] {rewindButton, pauseButton, fastForwardButton}) {
+            root.addView(button, new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.START));
         }
-        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        barParams.topMargin = Ui.dp(this, 14);
-        root.addView(bar, barParams);
+        root.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
+                oldBottom) -> placeTopButtons(right - left, bottom - top));
 
         // Shows "⏩ x3" or "⏪" while active, also when playing with a
         // controller and the buttons above are hidden.
@@ -167,6 +159,9 @@ public class GameActivity extends Activity
         loadSaveRam();
         slots = new SaveSlots(dir("states"), gameName);
         prefs = getSharedPreferences("games", MODE_PRIVATE);
+        gameAspect = NativeBridge.getAspectRatio();
+        View content = findViewById(android.R.id.content);
+        placeTopButtons(content.getWidth(), content.getHeight());
 
         emulator = new EmulatorThread();
         emulator.setAlignTop(isPortrait());
@@ -178,6 +173,53 @@ public class GameActivity extends Activity
         } else {
             autoSaveReady = true;
         }
+    }
+
+    /**
+     * Puts rewind, pause and fast-forward where they don't cover the game: under the picture in
+     * portrait, and in the black side bands in landscape. The picture's position follows the
+     * same rules as EmulatorThread.draw().
+     */
+    private void placeTopButtons(int width, int height) {
+        if (width == 0 || height == 0) {
+            return;
+        }
+        int pictureWidth = width;
+        int pictureHeight = Math.round(width / gameAspect);
+        if (pictureHeight > height) {
+            pictureHeight = height;
+            pictureWidth = Math.round(height * gameAspect);
+        }
+        int pictureLeft = (width - pictureWidth) / 2;
+        int pictureTop = isPortrait() ? 0 : (height - pictureHeight) / 2;
+
+        int size = Ui.dp(this, 44);
+        int gap = Ui.dp(this, 14);
+        int band = pictureLeft;  // width of each black side band
+        if (!isPortrait() && band >= size + gap) {
+            // Rewind on the left, fast-forward and pause on the right.
+            int leftX = (band - size) / 2;
+            int rightX = pictureLeft + pictureWidth + (band - size) / 2;
+            move(rewindButton, leftX, gap);
+            move(fastForwardButton, rightX, gap);
+            move(pauseButton, rightX, gap + size + gap);
+        } else {
+            // A row under the picture (or at the top if there is no room).
+            int rowWidth = size * 3 + gap * 2;
+            int x = (width - rowWidth) / 2;
+            int y = pictureTop + pictureHeight + gap;
+            if (y + size > height) {
+                y = gap;
+            }
+            move(rewindButton, x, y);
+            move(pauseButton, x + size + gap, y);
+            move(fastForwardButton, x + (size + gap) * 2, y);
+        }
+    }
+
+    private static void move(View view, int x, int y) {
+        view.setTranslationX(x);
+        view.setTranslationY(y);
     }
 
     private ImageView topButton(int icon, int description) {
@@ -369,11 +411,13 @@ public class GameActivity extends Activity
                 .show();
     }
 
-    /** The top buttons go with the touch controls, so nothing covers the game without them. */
+    /** Rewind, pause and fast-forward go with the touch controls, so nothing covers the game without them. */
     private void setTouchControlsVisible(boolean visible) {
         int visibility = visible ? View.VISIBLE : View.GONE;
         gamepad.setVisibility(visibility);
-        topBar.setVisibility(visibility);
+        rewindButton.setVisibility(visibility);
+        pauseButton.setVisibility(visibility);
+        fastForwardButton.setVisibility(visibility);
     }
 
     // --- Screen filter ------------------------------------------------------
