@@ -23,6 +23,28 @@ print("SCREENSHOT %s %s" % (sys.argv[2], base64.b64encode(buf.getvalue()).decode
 PY
 }
 
+# Taps the on-screen element whose text or description is $1.
+tap_text() {
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null
+    adb pull /sdcard/ui.xml ui.xml > /dev/null
+    local point
+    point=$(python3 - "$1" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+for node in ET.parse("ui.xml").iter("node"):
+    if want in (node.get("text", ""), node.get("content-desc", "")):
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)
+    if [ -z "$point" ]; then
+        echo "::warning::No encontré \"$1\" en pantalla"
+        return
+    fi
+    adb shell input tap $point
+}
+
 alive() {
     if ! adb shell pidof "$PKG" > /dev/null; then
         echo "::error::La app no está corriendo después de: $1"
@@ -115,23 +137,21 @@ adb shell input keyevent --longpress KEYCODE_BUTTON_L2
 sleep 1
 alive "avance rápido y rebobinar"
 
-# Pause menu, then the save slots (second item).
+# Pause menu, then the save slots.
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 shot menu
-adb shell input keyevent KEYCODE_DPAD_DOWN
-adb shell input keyevent KEYCODE_ENTER
+tap_text "Partidas guardadas"
 sleep 2
 shot slots
 alive "abrir las partidas guardadas"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
-# Controller setup, the fifth item of the pause menu.
+# Controller setup, from the pause menu.
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-for i in 1 2 3 4; do adb shell input keyevent KEYCODE_DPAD_DOWN; done
-adb shell input keyevent KEYCODE_ENTER
+tap_text "Configurar control"
 sleep 2
 shot controls
 alive "abrir la configuración del control"
