@@ -14,7 +14,14 @@ Color** (con [mGBA](https://mgba.io), en `third_party/mgba`).
 - Controles táctiles: cruceta, A/B/X/Y, L/R, Start y Select.
 - Mandos Bluetooth/USB (Xbox, PlayStation, 8BitDo...) y teclado.
 - Guardado del juego (SRAM) automático, como el cartucho original.
-- Guardar y cargar partida en cualquier momento (estado), desde el menú.
+- **Partidas guardadas**: 5 espacios por juego, cada uno con una foto del
+  momento, y un guardado automático al salir ("¿Continuar donde lo dejaste?").
+- **Avance rápido** (x3): botón ⏩ arriba o gatillo **R2**; un toque lo prende
+  y otro lo apaga.
+- **Rebobinar** hasta ~20 segundos: mantener apretado ⏪ arriba o el gatillo
+  **L2**.
+- **Pantalla**: Original, Suave o Tele vieja (con líneas de tele de tubo),
+  recordada para cada juego.
 - Funciona en vertical y horizontal.
 
 En el juego, el botón de **pausa** (arriba), el botón **Atrás** o el botón
@@ -43,8 +50,10 @@ Los botones funcionan por posición, igual que en el control de SNES:
 | Botón de la derecha (B) | A |
 | Botón de la izquierda (X) | Y |
 | Botón de arriba (Y) | X |
-| LB / LT | L |
-| RB / RT | R |
+| LB | L |
+| RB | R |
+| LT (L2) | Rebobinar (mantener) |
+| RT (R2) | Avance rápido (prender/apagar) |
 | Cruceta o palanca izquierda | Cruceta |
 | Start / Menú | Start |
 | Select / View | Select |

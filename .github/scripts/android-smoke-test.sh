@@ -97,23 +97,40 @@ sleep 1
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
-# Back to the SNES ROM, to check switching cores again.
+# Back to the SNES ROM, to check switching cores again. It was left
+# mid-game, so it should offer to continue from the automatic save.
 adb shell am start -W -n "$PKG/.GameActivity" -d "file://$DIR/smoke.sfc"
 sleep 5
+shot continue
 alive "volver a un juego de SNES"
+adb shell input keyevent KEYCODE_BACK
+sleep 2
 
-# Pause menu.
+# Fast-forward (Tab toggles it like R2) and rewind (Backspace, like L2).
+adb shell input keyevent KEYCODE_TAB
+sleep 2
+shot fast_forward
+adb shell input keyevent KEYCODE_TAB
+adb shell input keyevent --longpress KEYCODE_DEL
+sleep 1
+alive "avance rápido y rebobinar"
+
+# Pause menu, then the save slots (second item).
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 shot menu
-alive "abrir el menú de pausa"
+adb shell input keyevent KEYCODE_DPAD_DOWN
+adb shell input keyevent KEYCODE_ENTER
+sleep 2
+shot slots
+alive "abrir las partidas guardadas"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
 
 # Rotate to landscape and back.
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1
 sleep 3
-adb shell input keyevent KEYCODE_BACK
-sleep 2
 shot game_landscape
 alive "girar a horizontal"
 adb shell settings put system user_rotation 0

@@ -128,7 +128,7 @@ target_compile_options(frontend PRIVATE -O2)
 # The cores are loaded at runtime, but list them as dependencies so they are
 # always built and packaged.
 add_dependencies(frontend snes9x_libretro mgba_libretro)
-target_link_libraries(frontend ${CMAKE_DL_LIBS})
+target_link_libraries(frontend ${CMAKE_DL_LIBS} z)
 
 if(ANDROID)
     target_link_libraries(frontend log)

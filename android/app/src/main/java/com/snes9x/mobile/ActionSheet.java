@@ -92,10 +92,7 @@ final class ActionSheet {
         LinearLayout panel = new LinearLayout(context);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(pad, pad, pad, Ui.dp(context, 12));
-        android.graphics.drawable.GradientDrawable background =
-                Ui.rounded(Ui.SURFACE, Ui.dp(context, 28));
-        background.setStroke(Ui.dp(context, 2), Ui.SURFACE_HIGH);
-        panel.setBackground(background);
+        panel.setBackground(panelBackground(context));
 
         if (title != null) {
             TextView titleView = Ui.label(context, title, 24, Ui.TEXT);
@@ -133,23 +130,7 @@ final class ActionSheet {
             window.setDimAmount(0.45f);
         }
 
-        dialog.setOnKeyListener((d, keyCode, event) -> {
-            if (event.getAction() != KeyEvent.ACTION_UP) {
-                return keyCode == KeyEvent.KEYCODE_BUTTON_A || keyCode == KeyEvent.KEYCODE_BUTTON_B;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BUTTON_A) {
-                View focused = dialog.getCurrentFocus();
-                if (focused != null) {
-                    focused.performClick();
-                }
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BUTTON_B) {
-                dialog.cancel();
-                return true;
-            }
-            return false;
-        });
+        useControllerKeys(dialog);
         // The chosen action runs once the panel is gone, before onDismiss, so
         // an action can open another panel.
         dialog.setOnDismissListener(d -> {
@@ -171,6 +152,35 @@ final class ActionSheet {
             first.requestFocus();
         }
         return dialog;
+    }
+
+    /** On a controller, A presses the selected item and B closes the dialog. */
+    static void useControllerKeys(Dialog dialog) {
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_UP) {
+                return keyCode == KeyEvent.KEYCODE_BUTTON_A || keyCode == KeyEvent.KEYCODE_BUTTON_B;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_A) {
+                View focused = dialog.getCurrentFocus();
+                if (focused != null) {
+                    focused.performClick();
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_B) {
+                dialog.cancel();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    /** The rounded panel all dialogs use. */
+    static android.graphics.drawable.GradientDrawable panelBackground(Context context) {
+        android.graphics.drawable.GradientDrawable background =
+                Ui.rounded(Ui.SURFACE, Ui.dp(context, 28));
+        background.setStroke(Ui.dp(context, 2), Ui.SURFACE_HIGH);
+        return background;
     }
 
     private View row(Action action, Dialog dialog) {

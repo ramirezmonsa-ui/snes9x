@@ -37,10 +37,28 @@ final class EmulatorThread extends Thread {
     private boolean paused;
     private boolean stopped;
 
+    /** How the picture is drawn. */
+    static final int FILTER_SHARP = 0;
+    static final int FILTER_SMOOTH = 1;
+    static final int FILTER_CRT = 2;
+
+    /** Frames run per drawn frame while fast-forwarding. */
+    private static final int FAST_FORWARD_SPEED = 3;
+
     private Bitmap frame;
     private AudioTrack track;
     private float aspectRatio = 4f / 3f;
     private boolean alignTop;
+
+    private volatile boolean fastForward;
+    private volatile boolean rewinding;
+    private volatile int filter = FILTER_SHARP;
+
+    // Dark lines between the picture's rows for the CRT look, one pixel wide
+    // and stretched across the screen.
+    private Bitmap scanlines;
+    private int scanlineRows;
+    private final Paint scanlinePaint = new Paint();
 
     EmulatorThread() {
         super("Snes9x");
@@ -58,6 +76,30 @@ final class EmulatorThread extends Thread {
     /** In portrait the game goes at the top so the controls fit underneath. */
     void setAlignTop(boolean alignTop) {
         this.alignTop = alignTop;
+    }
+
+    void setFastForward(boolean fastForward) {
+        this.fastForward = fastForward;
+    }
+
+    boolean isFastForward() {
+        return fastForward;
+    }
+
+    /** While true the game runs backwards. */
+    void setRewinding(boolean rewinding) {
+        this.rewinding = rewinding;
+    }
+
+    void setFilter(int filter) {
+        this.filter = filter;
+    }
+
+    /** A copy of the frame on screen, or null if nothing was drawn yet. */
+    Bitmap snapshot() {
+        synchronized (video) {
+            return frame == null ? null : frame.copy(Bitmap.Config.RGB_565, false);
+        }
     }
 
     void setPaused(boolean paused) {
@@ -107,9 +149,42 @@ final class EmulatorThread extends Thread {
                 surface = holder;
             }
 
+            if (rewinding) {
+                // No sound while rewinding; two snapshots a frame (each is
+                // a few frames apart) so it runs back at about 2.5x.
+                if (track != null) {
+                    track.pause();
+                    track.flush();
+                }
+                if (NativeBridge.rewindStep(video, size)) {
+                    NativeBridge.rewindStep(video, size);
+                }
+                if (size[0] > 0 && size[1] > 0) {
+                    draw(surface, size[0], size[1]);
+                }
+                nextFrame += frameNanos;
+                long wait = (nextFrame - System.nanoTime()) / 1_000_000L;
+                if (wait > 0) {
+                    SystemClock.sleep(wait);
+                } else if (wait < -100) {
+                    nextFrame = System.nanoTime();
+                }
+                continue;
+            }
+
             int samples = NativeBridge.runFrame(video, audio, size);
             if (samples < 0) {
                 break;
+            }
+            if (fastForward) {
+                // Only the first frame's sound is played, so the audio
+                // still paces the loop but the game runs several times
+                // faster.
+                for (int i = 1; i < FAST_FORWARD_SPEED; i++) {
+                    if (NativeBridge.runFrame(video, null, size) < 0) {
+                        break;
+                    }
+                }
             }
             if (size[0] > 0 && size[1] > 0) {
                 draw(surface, size[0], size[1]);
@@ -136,6 +211,22 @@ final class EmulatorThread extends Thread {
             track.release();
             track = null;
         }
+    }
+
+    /** A 1 x screenHeight strip that darkens the bottom of each picture row. */
+    private Bitmap scanlines(int rows, int screenHeight) {
+        if (scanlines == null || scanlines.getHeight() != screenHeight || scanlineRows != rows) {
+            Bitmap strip = Bitmap.createBitmap(1, Math.max(1, screenHeight), Bitmap.Config.ARGB_8888);
+            for (int y = 0; y < strip.getHeight(); y++) {
+                float position = (y + 0.5f) * rows / screenHeight;
+                float within = position - (float) Math.floor(position);
+                // Dark band over the lower ~40% of every row.
+                strip.setPixel(0, y, within > 0.6f ? 0x73000000 : 0x00000000);
+            }
+            scanlines = strip;
+            scanlineRows = rows;
+        }
+        return scanlines;
     }
 
     private void createAudioTrack(int sampleRate) {
@@ -169,11 +260,13 @@ final class EmulatorThread extends Thread {
     }
 
     private void draw(SurfaceHolder holder, int width, int height) {
-        if (frame == null || frame.getWidth() != width || frame.getHeight() != height) {
-            frame = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+        synchronized (video) {
+            if (frame == null || frame.getWidth() != width || frame.getHeight() != height) {
+                frame = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+            }
+            video.rewind();
+            frame.copyPixelsFromBuffer(video);
         }
-        video.rewind();
-        frame.copyPixelsFromBuffer(video);
 
         Surface surface = holder.getSurface();
         if (surface == null || !surface.isValid()) {
@@ -202,7 +295,12 @@ final class EmulatorThread extends Thread {
             canvas.drawColor(Color.BLACK);
             source.set(0, 0, width, height);
             destination.set(left, top, left + w, top + h);
+            int mode = filter;
+            paint.setFilterBitmap(mode != FILTER_SHARP);
             canvas.drawBitmap(frame, source, destination, paint);
+            if (mode == FILTER_CRT) {
+                canvas.drawBitmap(scanlines(height, h), null, destination, scanlinePaint);
+            }
         } finally {
             try {
                 surface.unlockCanvasAndPost(canvas);

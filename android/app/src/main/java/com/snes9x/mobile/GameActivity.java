@@ -2,7 +2,9 @@ package com.snes9x.mobile;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
@@ -15,16 +17,17 @@ import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 
 /** Plays the ROM passed in the intent data. */
@@ -32,9 +35,18 @@ public class GameActivity extends Activity
         implements SurfaceHolder.Callback, InputManager.InputDeviceListener {
     private EmulatorThread emulator;
     private GamepadView gamepad;
-    private View pauseButton;
+    private View topBar;
+    private ImageView fastForwardButton;
+    private ImageView rewindButton;
+    private TextView speedBadge;
     private String gameName;
     private boolean loaded;
+    private SaveSlots slots;
+    private SharedPreferences prefs;
+
+    // The automatic save is only written once the player has decided whether
+    // to continue from the previous one, so it isn't overwritten by mistake.
+    private boolean autoSaveReady;
 
     // The emulator is shared by the whole app. Each game screen gets a number
     // when it loads its game, so a screen that is closing late doesn't save
@@ -46,7 +58,13 @@ public class GameActivity extends Activity
     private int touchButtons;
     private int keyButtons;
     private int axisButtons;
-    private int triggerButtons;
+
+    // Triggers: R2 turns fast-forward on and off, L2 rewinds while held.
+    // Some controllers send them as keys, others as axes, some as both; once
+    // keys are seen the axes are ignored so a press doesn't count twice.
+    private boolean triggerKeysSeen;
+    private boolean fastForwardTriggerDown;
+    private boolean rewindHeld;
 
     private InputManager inputManager;
     private boolean controllerConnected;
@@ -68,20 +86,49 @@ public class GameActivity extends Activity
         });
         root.addView(gamepad);
 
-        // Pause button at the top, the easiest way to reach the menu.
-        ImageView pause = new ImageView(this);
-        pauseButton = pause;
-        pause.setImageDrawable(Ui.icon(this, R.drawable.ic_pause, 0xFFFFFFFF));
-        int pausePad = Ui.dp(this, 10);
-        pause.setPadding(pausePad, pausePad, pausePad, pausePad);
-        pause.setBackground(Ui.rounded(0x66000000, Ui.dp(this, 22)));
-        pause.setAlpha(0.8f);
-        pause.setContentDescription(getString(R.string.menu_paused));
+        // Rewind, pause and fast-forward at the top. They hide with the touch
+        // controls, so nothing covers the game when playing with a controller.
+        LinearLayout bar = new LinearLayout(this);
+        topBar = bar;
+        rewindButton = topButton(R.drawable.ic_fast_rewind, R.string.rewind);
+        rewindButton.setOnTouchListener((v, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                setRewinding(true);
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                setRewinding(false);
+            }
+            return true;
+        });
+        ImageView pause = topButton(R.drawable.ic_pause, R.string.menu_paused);
         pause.setOnClickListener(v -> showMenu());
-        FrameLayout.LayoutParams pauseParams = new FrameLayout.LayoutParams(
-                Ui.dp(this, 44), Ui.dp(this, 44), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        pauseParams.topMargin = Ui.dp(this, 14);
-        root.addView(pause, pauseParams);
+        fastForwardButton = topButton(R.drawable.ic_fast_forward, R.string.fast_forward);
+        fastForwardButton.setOnClickListener(v -> toggleFastForward());
+        int size = Ui.dp(this, 44);
+        int gap = Ui.dp(this, 18);
+        for (ImageView button : new ImageView[] {rewindButton, pause, fastForwardButton}) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+            params.leftMargin = button == rewindButton ? 0 : gap;
+            bar.addView(button, params);
+        }
+        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        barParams.topMargin = Ui.dp(this, 14);
+        root.addView(bar, barParams);
+
+        // Shows "⏩ x3" or "⏪" while active, also when playing with a
+        // controller and the buttons above are hidden.
+        speedBadge = Ui.label(this, "", 15, 0xFFFFFFFF);
+        speedBadge.setBackground(Ui.rounded(0x99000000, Ui.dp(this, 14)));
+        speedBadge.setPadding(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        speedBadge.setVisibility(View.GONE);
+        FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END);
+        badgeParams.topMargin = Ui.dp(this, 20);
+        badgeParams.rightMargin = Ui.dp(this, 16);
+        root.addView(speedBadge, badgeParams);
 
         setContentView(root);
         hideSystemBars();
@@ -118,10 +165,64 @@ public class GameActivity extends Activity
         loaded = true;
         gameNumber = ++latestGame;
         loadSaveRam();
+        slots = new SaveSlots(dir("states"), gameName);
+        prefs = getSharedPreferences("games", MODE_PRIVATE);
 
         emulator = new EmulatorThread();
         emulator.setAlignTop(isPortrait());
+        emulator.setFilter(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP));
         emulator.start();
+
+        if (slots.exists(SaveSlots.AUTO)) {
+            askToContinue();
+        } else {
+            autoSaveReady = true;
+        }
+    }
+
+    private ImageView topButton(int icon, int description) {
+        ImageView button = new ImageView(this);
+        button.setImageDrawable(Ui.icon(this, icon, 0xFFFFFFFF));
+        int pad = Ui.dp(this, 10);
+        button.setPadding(pad, pad, pad, pad);
+        button.setBackground(Ui.rounded(0x66000000, Ui.dp(this, 22)));
+        button.setAlpha(0.85f);
+        button.setContentDescription(getString(description));
+        return button;
+    }
+
+    // --- Fast-forward and rewind --------------------------------------------
+
+    private void toggleFastForward() {
+        if (emulator == null) {
+            return;
+        }
+        emulator.setFastForward(!emulator.isFastForward());
+        updateSpeedIndicators();
+    }
+
+    private void setRewinding(boolean rewinding) {
+        if (emulator == null || rewinding == rewindHeld) {
+            return;
+        }
+        rewindHeld = rewinding;
+        emulator.setRewinding(rewinding);
+        updateSpeedIndicators();
+    }
+
+    private void updateSpeedIndicators() {
+        boolean fast = emulator != null && emulator.isFastForward();
+        fastForwardButton.setBackground(Ui.rounded(fast ? Ui.RED : 0x66000000, Ui.dp(this, 22)));
+        rewindButton.setBackground(Ui.rounded(rewindHeld ? Ui.BLUE : 0x66000000, Ui.dp(this, 22)));
+        if (rewindHeld) {
+            speedBadge.setText(getString(R.string.badge_rewind));
+            speedBadge.setVisibility(View.VISIBLE);
+        } else if (fast) {
+            speedBadge.setText(getString(R.string.badge_fast_forward));
+            speedBadge.setVisibility(View.VISIBLE);
+        } else {
+            speedBadge.setVisibility(View.GONE);
+        }
     }
 
     private void fail(String message) {
@@ -157,6 +258,7 @@ public class GameActivity extends Activity
             emulator.setPaused(true);
         }
         storeSaveRam();
+        storeAutoSave();
     }
 
     @Override
@@ -233,25 +335,20 @@ public class GameActivity extends Activity
         // Forget held buttons so nothing stays pressed after closing the menu.
         keyButtons = 0;
         axisButtons = 0;
-        triggerButtons = 0;
         updateButtons();
+        setRewinding(false);
 
-        File state = stateFile();
-        String saved = state.isFile()
-                ? getString(R.string.state_saved_at, DateUtils.getRelativeTimeSpanString(
-                        state.lastModified(), System.currentTimeMillis(),
-                        DateUtils.MINUTE_IN_MILLIS))
-                : getString(R.string.state_none);
         boolean touchVisible = gamepad.getVisibility() == View.VISIBLE;
 
         new ActionSheet(this)
                 .title(gameName)
                 .subtitle(getString(R.string.menu_paused))
                 .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.menu_resume), null)
-                .action(Ui.BLUE, R.drawable.ic_save, getString(R.string.menu_save_state),
-                        getString(R.string.menu_save_state_detail), this::saveState)
-                .action(Ui.YELLOW, R.drawable.ic_history, getString(R.string.menu_load_state), saved,
-                        this::loadState)
+                .action(Ui.BLUE, R.drawable.ic_save, getString(R.string.menu_slots),
+                        getString(R.string.menu_slots_detail), this::showSlots)
+                .action(Ui.YELLOW, R.drawable.ic_tv, getString(R.string.menu_screen,
+                        filterName(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP))),
+                        null, this::chooseFilter)
                 .action(Ui.SHELL, R.drawable.ic_gamepad, getString(touchVisible
                         ? R.string.menu_hide_controls : R.string.menu_show_controls),
                         () -> setTouchControlsVisible(!touchVisible))
@@ -272,11 +369,50 @@ public class GameActivity extends Activity
                 .show();
     }
 
-    /** The pause button goes with the touch controls, so nothing covers the game without them. */
+    /** The top buttons go with the touch controls, so nothing covers the game without them. */
     private void setTouchControlsVisible(boolean visible) {
         int visibility = visible ? View.VISIBLE : View.GONE;
         gamepad.setVisibility(visibility);
-        pauseButton.setVisibility(visibility);
+        topBar.setVisibility(visibility);
+    }
+
+    // --- Screen filter ------------------------------------------------------
+
+    private String filterKey() {
+        return "filter:" + gameName;
+    }
+
+    private String filterName(int filter) {
+        switch (filter) {
+            case EmulatorThread.FILTER_SMOOTH: return getString(R.string.filter_smooth);
+            case EmulatorThread.FILTER_CRT: return getString(R.string.filter_crt);
+            default: return getString(R.string.filter_sharp);
+        }
+    }
+
+    private void chooseFilter() {
+        pauseForMenu();
+        new ActionSheet(this)
+                .title(getString(R.string.filter_title))
+                .subtitle(getString(R.string.filter_subtitle))
+                .action(Ui.BLUE, R.drawable.ic_tv, getString(R.string.filter_sharp),
+                        getString(R.string.filter_sharp_detail),
+                        () -> setFilter(EmulatorThread.FILTER_SHARP))
+                .action(Ui.GREEN, R.drawable.ic_tv, getString(R.string.filter_smooth),
+                        getString(R.string.filter_smooth_detail),
+                        () -> setFilter(EmulatorThread.FILTER_SMOOTH))
+                .action(Ui.RED, R.drawable.ic_tv, getString(R.string.filter_crt),
+                        getString(R.string.filter_crt_detail),
+                        () -> setFilter(EmulatorThread.FILTER_CRT))
+                .onDismiss(this::onMenuClosed)
+                .show();
+    }
+
+    private void setFilter(int filter) {
+        prefs.edit().putInt(filterKey(), filter).apply();
+        if (emulator != null) {
+            emulator.setFilter(filter);
+        }
     }
 
     private void pauseForMenu() {
@@ -308,36 +444,84 @@ public class GameActivity extends Activity
         return dir;
     }
 
-    private File stateFile() {
-        return new File(dir("states"), gameName + ".state");
+    private void showSlots() {
+        pauseForMenu();
+        SlotsDialog.show(this, slots, this::showSlotActions, this::onMenuClosed);
     }
 
-    private File saveRamFile() {
-        return new File(dir("saves"), gameName + ".srm");
+    private void showSlotActions(int slot) {
+        pauseForMenu();
+        String name = slot == SaveSlots.AUTO
+                ? getString(R.string.slot_auto) : getString(R.string.slot_number, slot);
+        ActionSheet sheet = new ActionSheet(this).title(name);
+        if (slots.exists(slot)) {
+            sheet.subtitle(getString(R.string.state_saved_at, DateUtils.getRelativeTimeSpanString(
+                    slots.time(slot), System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)));
+            sheet.action(Ui.YELLOW, R.drawable.ic_history, getString(R.string.slot_load),
+                    () -> loadSlot(slot));
+        } else {
+            sheet.subtitle(getString(R.string.slot_empty));
+        }
+        if (slot != SaveSlots.AUTO) {
+            sheet.action(Ui.BLUE, R.drawable.ic_save, getString(R.string.slot_save),
+                    slots.exists(slot) ? getString(R.string.slot_overwrite) : null,
+                    () -> saveSlot(slot));
+        }
+        sheet.action(Ui.SHELL, R.drawable.ic_play, getString(R.string.cancel), null)
+                .onDismiss(this::onMenuClosed)
+                .show();
     }
 
-    private void saveState() {
-        byte[] state = NativeBridge.saveState();
-        if (state != null && writeFile(stateFile(), state)) {
+    private void saveSlot(int slot) {
+        Bitmap picture = emulator != null ? emulator.snapshot() : null;
+        if (slots.save(slot, NativeBridge.saveState(), picture)) {
             Toast.makeText(this, R.string.state_saved, Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, R.string.state_save_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void loadState() {
-        byte[] state = readFile(stateFile());
-        if (state == null) {
-            Toast.makeText(this, R.string.state_missing, Toast.LENGTH_SHORT).show();
-        } else if (NativeBridge.loadState(state)) {
+    private void loadSlot(int slot) {
+        byte[] state = slots.load(slot);
+        if (state != null && NativeBridge.loadState(state)) {
             Toast.makeText(this, R.string.state_loaded, Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(this, R.string.state_load_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
+    /** On opening a game that was left mid-play, offer to continue from there. */
+    private void askToContinue() {
+        pauseForMenu();
+        new ActionSheet(this)
+                .title(getString(R.string.continue_title))
+                .subtitle(getString(R.string.continue_subtitle, DateUtils.getRelativeTimeSpanString(
+                        slots.time(SaveSlots.AUTO), System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS)))
+                .action(Ui.GREEN, R.drawable.ic_play, getString(R.string.continue_yes),
+                        () -> loadSlot(SaveSlots.AUTO))
+                .action(Ui.SHELL, R.drawable.ic_refresh, getString(R.string.continue_no),
+                        getString(R.string.continue_no_detail), null)
+                .onDismiss(() -> {
+                    autoSaveReady = true;
+                    onMenuClosed();
+                })
+                .show();
+    }
+
+    private void storeAutoSave() {
+        if (!loaded || !autoSaveReady || gameNumber != latestGame || emulator == null) {
+            return;
+        }
+        slots.save(SaveSlots.AUTO, NativeBridge.saveState(), emulator.snapshot());
+    }
+
+    private File saveRamFile() {
+        return new File(dir("saves"), gameName + ".srm");
+    }
+
     private void loadSaveRam() {
-        byte[] sram = readFile(saveRamFile());
+        byte[] sram = SaveSlots.readFile(saveRamFile());
         if (sram != null) {
             NativeBridge.setSaveRam(sram);
         }
@@ -349,44 +533,14 @@ public class GameActivity extends Activity
         }
         byte[] sram = NativeBridge.getSaveRam();
         if (sram != null) {
-            writeFile(saveRamFile(), sram);
-        }
-    }
-
-    private static boolean writeFile(File file, byte[] data) {
-        File temp = new File(file.getPath() + ".tmp");
-        try (FileOutputStream out = new FileOutputStream(temp)) {
-            out.write(data);
-        } catch (IOException e) {
-            return false;
-        }
-        return temp.renameTo(file);
-    }
-
-    private static byte[] readFile(File file) {
-        if (!file.isFile()) {
-            return null;
-        }
-        try (FileInputStream in = new FileInputStream(file)) {
-            byte[] data = new byte[(int) file.length()];
-            int offset = 0;
-            while (offset < data.length) {
-                int n = in.read(data, offset, data.length - offset);
-                if (n < 0) {
-                    return null;
-                }
-                offset += n;
-            }
-            return data;
-        } catch (IOException e) {
-            return null;
+            SaveSlots.writeFile(saveRamFile(), sram);
         }
     }
 
     // --- Physical controllers -----------------------------------------------
 
     private void updateButtons() {
-        NativeBridge.setButtons(touchButtons | keyButtons | axisButtons | triggerButtons);
+        NativeBridge.setButtons(touchButtons | keyButtons | axisButtons);
     }
 
     private static int buttonForKey(int keyCode) {
@@ -403,8 +557,6 @@ public class GameActivity extends Activity
             case KeyEvent.KEYCODE_BUTTON_Y: return NativeBridge.BUTTON_X;
             case KeyEvent.KEYCODE_BUTTON_L1: return NativeBridge.BUTTON_L;
             case KeyEvent.KEYCODE_BUTTON_R1: return NativeBridge.BUTTON_R;
-            case KeyEvent.KEYCODE_BUTTON_L2: return NativeBridge.BUTTON_L;
-            case KeyEvent.KEYCODE_BUTTON_R2: return NativeBridge.BUTTON_R;
             case KeyEvent.KEYCODE_BUTTON_START: return NativeBridge.BUTTON_START;
             case KeyEvent.KEYCODE_BUTTON_SELECT: return NativeBridge.BUTTON_SELECT;
             // Keyboard, handy on Chromebooks and with the emulator.
@@ -426,6 +578,23 @@ public class GameActivity extends Activity
         if (keyCode == KeyEvent.KEYCODE_BUTTON_MODE) {
             if (event.getAction() == KeyEvent.ACTION_UP) {
                 showMenu();
+            }
+            return true;
+        }
+        // R2 (or Tab) toggles fast-forward, L2 (or Backspace) rewinds while held.
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_R2 || keyCode == KeyEvent.KEYCODE_TAB) {
+            triggerKeysSeen |= keyCode == KeyEvent.KEYCODE_BUTTON_R2;
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                toggleFastForward();
+            }
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_L2 || keyCode == KeyEvent.KEYCODE_DEL) {
+            triggerKeysSeen |= keyCode == KeyEvent.KEYCODE_BUTTON_L2;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                setRewinding(true);
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                setRewinding(false);
             }
             return true;
         }
@@ -471,20 +640,30 @@ public class GameActivity extends Activity
         }
         axisButtons = buttons;
 
-        // Analog triggers (L2/R2) act as L and R. Depending on the mode,
-        // controllers report them as the trigger or the brake/gas axes.
-        int triggers = 0;
-        if (Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
-                event.getAxisValue(MotionEvent.AXIS_BRAKE)) > 0.5f) {
-            triggers |= NativeBridge.BUTTON_L;
+        // Analog triggers. Depending on the mode, controllers report them
+        // as the trigger or the brake/gas axes.
+        boolean triggerUsed = false;
+        if (!triggerKeysSeen) {
+            float left = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_BRAKE));
+            float right = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_GAS));
+            if (left > 0.5f) {
+                setRewinding(true);
+                triggerUsed = true;
+            } else if (left < 0.3f && rewindHeld) {
+                setRewinding(false);
+            }
+            if (right > 0.5f && !fastForwardTriggerDown) {
+                fastForwardTriggerDown = true;
+                toggleFastForward();
+                triggerUsed = true;
+            } else if (right < 0.3f) {
+                fastForwardTriggerDown = false;
+            }
         }
-        if (Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
-                event.getAxisValue(MotionEvent.AXIS_GAS)) > 0.5f) {
-            triggers |= NativeBridge.BUTTON_R;
-        }
-        triggerButtons = triggers;
 
-        if (buttons != 0 || triggers != 0) {
+        if (buttons != 0 || triggerUsed) {
             onControllerUsed();
         }
         updateButtons();

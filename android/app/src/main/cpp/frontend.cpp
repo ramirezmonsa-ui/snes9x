@@ -7,11 +7,13 @@
 
 #include <dlfcn.h>
 #include <jni.h>
+#include <zlib.h>
 
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <string>
@@ -81,6 +83,75 @@ std::vector<int16_t> g_audio;
 volatile int g_buttons = 0;
 
 bool g_game_loaded = false;
+
+// Rewind: a save state every kRewindInterval frames, compressed, newest at
+// the back. Old ones are dropped past kRewindSeconds or kRewindBudget bytes.
+constexpr int kRewindInterval = 5;
+constexpr int kRewindSeconds = 20;
+constexpr size_t kRewindBudget = 48 * 1024 * 1024;
+struct Snapshot {
+    uint32_t size;               // uncompressed size
+    std::vector<uint8_t> data;   // zlib-compressed state
+};
+std::deque<Snapshot> g_rewind;
+size_t g_rewind_bytes = 0;
+int g_frame_counter = 0;
+std::vector<uint8_t> g_state_buffer;
+
+void rewind_clear()
+{
+    g_rewind.clear();
+    g_rewind_bytes = 0;
+    g_frame_counter = 0;
+}
+
+void rewind_capture()
+{
+    size_t size = g_core.serialize_size();
+    if (size == 0)
+        return;
+    g_state_buffer.resize(size);
+    if (!g_core.serialize(g_state_buffer.data(), size))
+        return;
+
+    Snapshot snapshot;
+    snapshot.size = (uint32_t)size;
+    uLongf compressed = compressBound(size);
+    snapshot.data.resize(compressed);
+    if (compress2(snapshot.data.data(), &compressed, g_state_buffer.data(), size, 1) != Z_OK)
+        return;
+    snapshot.data.resize(compressed);
+    snapshot.data.shrink_to_fit();
+
+    g_rewind_bytes += snapshot.data.size();
+    g_rewind.push_back(std::move(snapshot));
+
+    size_t max_count = (size_t)(kRewindSeconds * 60 / kRewindInterval);
+    while (g_rewind.size() > max_count || (g_rewind_bytes > kRewindBudget && g_rewind.size() > 1))
+    {
+        g_rewind_bytes -= g_rewind.front().data.size();
+        g_rewind.pop_front();
+    }
+}
+
+// Copies the last frame into the Java buffer and its size into `size`.
+void copy_frame(JNIEnv *env, jobject video, jintArray size)
+{
+    jint dims[2] = { 0, 0 };
+    if (g_frame_ready)
+    {
+        void *dst = env->GetDirectBufferAddress(video);
+        jlong capacity = env->GetDirectBufferCapacity(video);
+        jlong bytes = (jlong)g_frame_width * g_frame_height * 2;
+        if (dst && capacity >= bytes)
+        {
+            memcpy(dst, g_frame.data(), bytes);
+            dims[0] = g_frame_width;
+            dims[1] = g_frame_height;
+        }
+    }
+    env->SetIntArrayRegion(size, 0, 2, dims);
+}
 
 void log_message(int prio, const char *fmt, va_list args)
 {
@@ -274,6 +345,7 @@ static void close_core()
     dlclose(g_core.handle);
     g_core = Core();
     g_options.clear();
+    rewind_clear();
 }
 
 static bool open_core(const std::string &dir, const std::string &file)
@@ -366,6 +438,7 @@ Java_com_snes9x_mobile_NativeBridge_loadGame(JNIEnv *env, jclass, jbyteArray rom
     if (g_game_loaded)
         g_core.unload_game();
 
+    rewind_clear();
     g_game_loaded = g_core.load_game(&info);
     if (g_game_loaded)
         g_core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
@@ -425,25 +498,17 @@ Java_com_snes9x_mobile_NativeBridge_runFrame(JNIEnv *env, jclass, jobject video,
     if (!g_game_loaded)
         return -1;
 
+    if (g_frame_counter++ % kRewindInterval == 0)
+        rewind_capture();
+
     g_audio.clear();
     g_frame_ready = false;
     g_core.run();
+    copy_frame(env, video, size);
 
-    jint dims[2] = { 0, 0 };
-    if (g_frame_ready)
-    {
-        void *dst = env->GetDirectBufferAddress(video);
-        jlong capacity = env->GetDirectBufferCapacity(video);
-        jlong bytes = (jlong)g_frame_width * g_frame_height * 2;
-        if (dst && capacity >= bytes)
-        {
-            memcpy(dst, g_frame.data(), bytes);
-            dims[0] = g_frame_width;
-            dims[1] = g_frame_height;
-        }
-    }
-    env->SetIntArrayRegion(size, 0, 2, dims);
-
+    // A null array means the sound of this frame isn't wanted.
+    if (!audio)
+        return 0;
     jsize count = (jsize)g_audio.size();
     jsize capacity = env->GetArrayLength(audio);
     if (count > capacity)
@@ -453,12 +518,47 @@ Java_com_snes9x_mobile_NativeBridge_runFrame(JNIEnv *env, jclass, jobject video,
     return count;
 }
 
+// Steps back to the previous rewind snapshot and runs one frame from it
+// (without sound) to show it. Returns false when there is nothing left.
+JNIEXPORT jboolean JNICALL
+Java_com_snes9x_mobile_NativeBridge_rewindStep(JNIEnv *env, jclass, jobject video, jintArray size)
+{
+    std::lock_guard<std::mutex> guard(g_lock);
+    if (!g_game_loaded || g_rewind.empty())
+        return JNI_FALSE;
+
+    Snapshot &snapshot = g_rewind.back();
+    g_state_buffer.resize(snapshot.size);
+    uLongf length = snapshot.size;
+    bool ok = uncompress(g_state_buffer.data(), &length, snapshot.data.data(), snapshot.data.size()) == Z_OK
+        && g_core.unserialize(g_state_buffer.data(), length);
+    // Keep the oldest snapshot so holding rewind stops there instead of
+    // running out.
+    if (g_rewind.size() > 1)
+    {
+        g_rewind_bytes -= snapshot.data.size();
+        g_rewind.pop_back();
+    }
+    if (!ok)
+        return JNI_FALSE;
+
+    g_frame_counter = 1;
+    g_frame_ready = false;
+    g_core.run();
+    g_audio.clear();
+    copy_frame(env, video, size);
+    return JNI_TRUE;
+}
+
 JNIEXPORT void JNICALL
 Java_com_snes9x_mobile_NativeBridge_reset(JNIEnv *, jclass)
 {
     std::lock_guard<std::mutex> guard(g_lock);
     if (g_game_loaded)
+    {
         g_core.reset();
+        rewind_clear();
+    }
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -490,7 +590,11 @@ Java_com_snes9x_mobile_NativeBridge_loadState(JNIEnv *env, jclass, jbyteArray st
     jsize size = env->GetArrayLength(state);
     std::vector<uint8_t> buffer(size);
     env->GetByteArrayRegion(state, 0, size, reinterpret_cast<jbyte *>(buffer.data()));
-    return g_core.unserialize(buffer.data(), buffer.size()) ? JNI_TRUE : JNI_FALSE;
+    if (!g_core.unserialize(buffer.data(), buffer.size()))
+        return JNI_FALSE;
+    // Rewinding past a loaded state would jump between unrelated moments.
+    rewind_clear();
+    return JNI_TRUE;
 }
 
 // Battery-backed cartridge RAM (the in-game save), or null if the cartridge

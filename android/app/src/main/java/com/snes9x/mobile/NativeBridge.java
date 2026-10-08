@@ -47,11 +47,17 @@ public final class NativeBridge {
     public static native void setButtons(int mask);
 
     /**
-     * Runs one frame. Returns the number of audio samples written to {@code audio}, or -1 if no
-     * game is loaded. {@code size} receives the frame width and height, or 0 when there is no new
+     * Runs one frame. Returns the number of audio samples written to {@code audio} (which may be
+     * null to skip the sound), or -1 if no game is loaded. {@code size} receives the frame width and height, or 0 when there is no new
      * frame.
      */
     public static native int runFrame(ByteBuffer video, short[] audio, int[] size);
+
+    /**
+     * Goes back a little (the app keeps about 20 seconds of history) and puts that frame in
+     * {@code video}. Returns false if there is no history.
+     */
+    public static native boolean rewindStep(ByteBuffer video, int[] size);
 
     public static native void reset();
 
