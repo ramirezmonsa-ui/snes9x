@@ -51,6 +51,7 @@
     <string name="controls_info_title">Botones traseros y extra</string>
     <string name="controls_ok">Entendido</string>
     <string name="controls_extra">Funciones extra</string>
+    <string name="controls_focused">«%1$s» (ahora %2$s). Presiona A para cambiarlo.</string>
     <string name="controls_dpad">La cruceta y la palanca izquierda siempre sirven para moverse.</string>
     <string name="controls_press">Presiona un botón…</string>
     <string name="controls_none">Sin asignar</string>

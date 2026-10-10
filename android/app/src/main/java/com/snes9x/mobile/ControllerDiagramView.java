@@ -23,6 +23,9 @@ final class ControllerDiagramView extends View {
 
         /** The d-pad was tapped; it can't be reassigned. */
         void onDpadPicked();
+
+        /** A controller's d-pad moved to this button; nothing on the picture marks it. */
+        void onButtonFocused(ControllerMapping.Action action);
     }
 
     /** Where a button is on the picture, in layout units (the view is 100 units wide). */
@@ -59,18 +62,14 @@ final class ControllerDiagramView extends View {
             new EnumMap<>(ControllerMapping.Action.class);
     private final Bitmap picture;
     private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
-    private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
 
     private Listener listener;
-    private ControllerMapping.Action selected;
     private int keyboardIndex;
 
     ControllerDiagramView(Context context) {
         super(context);
         picture = BitmapFactory.decodeResource(context.getResources(), R.drawable.controller_picture);
-        stroke.setStyle(Paint.Style.STROKE);
         setFocusable(true);
         setClickable(true);
 
@@ -86,11 +85,6 @@ final class ControllerDiagramView extends View {
 
     void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    void setSelected(ControllerMapping.Action action) {
-        selected = action;
-        invalidate();
     }
 
     @Override
@@ -116,32 +110,6 @@ final class ControllerDiagramView extends View {
             rect.set(0, PICTURE_TOP * u, 100 * u, PICTURE_TOP * u + height);
             canvas.drawBitmap(picture, null, rect, bitmapPaint);
         }
-        for (ControllerMapping.Action action : ORDER) {
-            drawRing(canvas, action, spots.get(action), u);
-        }
-    }
-
-    /**
-     * Nothing is drawn over the picture except a ring around the button being changed (red) or
-     * the one a controller's d-pad is on (blue).
-     */
-    private void drawRing(Canvas canvas, ControllerMapping.Action action, Spot spot, float u) {
-        boolean picked = action == selected;
-        boolean focusedHere = isFocused() && ORDER[keyboardIndex] == action;
-        if (!picked && !focusedHere) {
-            return;
-        }
-        boolean round = spot.minWidth <= 2 * FACE_R;
-        float halfWidth = (round ? FACE_R + 1.4f : spot.minWidth / 2 + 1) * u;
-        float halfHeight = (round ? FACE_R + 1.4f : 3.2f) * u;
-        rect.set(spot.x * u - halfWidth, spot.y * u - halfHeight,
-                spot.x * u + halfWidth, spot.y * u + halfHeight);
-        stroke.setColor(0xFFFFFFFF);
-        stroke.setStrokeWidth(1.8f * u);
-        canvas.drawRoundRect(rect, halfHeight, halfHeight, stroke);
-        stroke.setColor(picked ? Ui.RED : Ui.FOCUS);
-        stroke.setStrokeWidth(0.9f * u);
-        canvas.drawRoundRect(rect, halfHeight, halfHeight, stroke);
     }
 
     // --- Picking -------------------------------------------------------------
@@ -194,13 +162,13 @@ final class ControllerDiagramView extends View {
     }
 
     // With a controller or keyboard: the d-pad moves between buttons, and A
-    // or Enter picks the one with the blue ring.
+    // or Enter picks the current one.
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (keyboardIndex < ORDER.length - 1) {
                 keyboardIndex++;
-                invalidate();
+                announceFocus();
                 return true;
             }
             return false;  // focus moves on to the buttons below
@@ -208,7 +176,7 @@ final class ControllerDiagramView extends View {
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (keyboardIndex > 0) {
                 keyboardIndex--;
-                invalidate();
+                announceFocus();
                 return true;
             }
             return false;
@@ -228,6 +196,14 @@ final class ControllerDiagramView extends View {
     @Override
     protected void onFocusChanged(boolean gainFocus, int direction, android.graphics.Rect previous) {
         super.onFocusChanged(gainFocus, direction, previous);
-        invalidate();
+        if (gainFocus) {
+            announceFocus();
+        }
+    }
+
+    private void announceFocus() {
+        if (listener != null) {
+            listener.onButtonFocused(ORDER[keyboardIndex]);
+        }
     }
 }

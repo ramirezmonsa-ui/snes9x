@@ -89,6 +89,14 @@ final class ControlsDialog extends Dialog {
                 stopListening();
                 hint.setText(R.string.controls_dpad);
             }
+
+            @Override
+            public void onButtonFocused(ControllerMapping.Action action) {
+                if (listening == null && Ui.keyNavigation) {
+                    hint.setText(context.getString(R.string.controls_focused,
+                            actionName(context, action), keysText(context, action)));
+                }
+            }
         });
         content.addView(diagram, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -213,7 +221,6 @@ final class ControlsDialog extends Dialog {
             label.setText(R.string.controls_press);
             label.setTextColor(Ui.RED);
         }
-        diagram.setSelected(action);
         hint.setText(getContext().getString(R.string.controls_listening,
                 actionName(getContext(), action), keysText(getContext(), action)));
     }
@@ -221,7 +228,6 @@ final class ControlsDialog extends Dialog {
     private void stopListening() {
         listening = null;
         listeningLabel = null;
-        diagram.setSelected(null);
         hint.setText(R.string.controls_hint);
     }
 
