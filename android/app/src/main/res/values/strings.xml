@@ -66,7 +66,7 @@
     <string name="slots_title">Partidas guardadas</string>
     <string name="slots_hint">Toca un espacio para guardar o cargar</string>
     <string name="slot_number">Espacio %1$d</string>
-    <string name="slot_auto">AUTO</string>
+    <string name="slot_auto">Autosave</string>
     <string name="slot_empty">Vacío</string>
     <string name="slot_saved">Guardado</string>
     <string name="slot_save">Guardar aquí</string>
