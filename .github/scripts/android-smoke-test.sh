@@ -155,6 +155,16 @@ tap_text "Configurar control"
 sleep 2
 shot controls
 alive "abrir la configuración del control"
+# The popup that waits for a button, before and after pressing one.
+tap_text "Avance rápido"
+sleep 2
+shot capture
+adb shell input keyevent KEYCODE_BUTTON_X
+sleep 1
+shot capture_pressed
+alive "elegir un botón en el popup"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 

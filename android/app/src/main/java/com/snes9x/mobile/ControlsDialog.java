@@ -5,9 +5,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
-import android.view.InputDevice;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -19,8 +17,9 @@ import android.widget.TextView;
 import java.util.List;
 
 /**
- * Lets the player choose which controller button does each action: tap a button on the drawing
- * of the controller (or one of the extra functions below it), then press the button for it.
+ * Lets the player choose which controller button does each action: tap a button on the picture
+ * of the controller (or one of the extra functions below it), then press the button for it in
+ * the popup that opens.
  */
 final class ControlsDialog extends Dialog {
     /** Actions that aren't on the SNES controller, listed under the drawing. */
@@ -33,10 +32,6 @@ final class ControlsDialog extends Dialog {
     private final ControllerDiagramView diagram;
     private final LinearLayout list;
     private final TextView hint;
-
-    /** The action waiting for a button press, or null. */
-    private ControllerMapping.Action listening;
-    private TextView listeningLabel;
 
     ControlsDialog(Context context, ControllerMapping mapping) {
         super(context);
@@ -84,19 +79,18 @@ final class ControlsDialog extends Dialog {
         diagram.setListener(new ControllerDiagramView.Listener() {
             @Override
             public void onButtonPicked(ControllerMapping.Action action) {
-                startListening(action, null);
+                capture(action);
             }
 
             @Override
             public void onDpadPicked() {
                 Ui.vibrate(context, false);
-                stopListening();
                 hint.setText(R.string.controls_dpad);
             }
 
             @Override
             public void onButtonFocused(ControllerMapping.Action action) {
-                if (listening == null && Ui.keyNavigation) {
+                if (Ui.keyNavigation) {
                     hint.setText(context.getString(R.string.controls_focused,
                             actionName(context, action), keysText(context, action)));
                 }
@@ -125,7 +119,7 @@ final class ControlsDialog extends Dialog {
         buttons.setPadding(0, Ui.dp(context, 10), 0, 0);
         buttons.addView(textButton(context, R.string.controls_reset, Ui.TEXT_DIM, v -> {
             mapping.reset();
-            stopListening();
+            hint.setText(R.string.controls_hint);
             refresh();
         }));
         buttons.addView(textButton(context, R.string.controls_done, Ui.RED, v -> dismiss()));
@@ -172,28 +166,16 @@ final class ControlsDialog extends Dialog {
         row.setFocusable(true);
         row.setClickable(true);
 
-        int size = Ui.dp(context, 38);
-        if (action.button != null) {
-            TextView chip = Ui.label(context, action.button, action.button.length() > 1 ? 11 : 17,
-                    0xFFFFFFFF);
-            chip.setGravity(Gravity.CENTER);
-            chip.setBackground(Ui.rounded(chipColor(action), size / 2f));
-            row.addView(chip, new LinearLayout.LayoutParams(
-                    action.button.length() > 1 ? Ui.dp(context, 58) : size, size));
-        } else {
-            row.addView(Ui.faceButton(context, actionIcon(action), actionColor(action), size),
-                    new LinearLayout.LayoutParams(size, size));
-        }
+        row.addView(chip(context, action, 38));
 
         LinearLayout labels = new LinearLayout(context);
         labels.setOrientation(LinearLayout.VERTICAL);
         labels.setPadding(Ui.dp(context, 14), 0, 0, 0);
         labels.addView(Ui.label(context, actionName(context, action), 16, Ui.TEXT));
-        TextView keys = Ui.text(context, keysText(context, action), 13, Ui.TEXT_DIM, false);
-        labels.addView(keys);
+        labels.addView(Ui.text(context, keysText(context, action), 13, Ui.TEXT_DIM, false));
         row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        row.setOnClickListener(v -> startListening(action, keys));
+        row.setOnClickListener(v -> capture(action));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.topMargin = Ui.dp(context, 2);
@@ -217,53 +199,22 @@ final class ControlsDialog extends Dialog {
         return out.length() > 0 ? out.toString() : context.getString(R.string.controls_none);
     }
 
-    private void startListening(ControllerMapping.Action action, TextView label) {
-        stopListening();
-        Ui.vibrate(getContext(), false);
-        listening = action;
-        listeningLabel = label;
-        if (label != null) {
-            label.setText(R.string.controls_press);
-            label.setTextColor(Ui.RED);
-        }
-        hint.setText(getContext().getString(R.string.controls_listening,
-                actionName(getContext(), action), keysText(getContext(), action)));
-    }
-
-    private void stopListening() {
-        listening = null;
-        listeningLabel = null;
-        hint.setText(R.string.controls_hint);
-    }
-
-    private void assign(int keyCode) {
-        ControllerMapping.Action action = listening;
-        stopListening();
-        mapping.assign(keyCode, action);
-        Ui.vibrate(getContext(), true);
-        refresh();
+    /** Opens the popup that waits for the new button. */
+    private void capture(ControllerMapping.Action action) {
+        Context context = getContext();
+        Ui.vibrate(context, false);
+        new KeyCaptureDialog(context, action, chip(context, action, 64), actionName(context, action),
+                keysText(context, action), (picked, keyCode) -> {
+                    mapping.assign(keyCode, picked);
+                    hint.setText(R.string.controls_hint);
+                    refresh();
+                }).show();
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // A picks the selected button or row, B closes.
         int keyCode = event.getKeyCode();
-        if (listening != null) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event.getAction() == KeyEvent.ACTION_UP) {
-                    stopListening();
-                    refresh();
-                }
-                return true;
-            }
-            if (ControllerMapping.isDpad(keyCode)) {
-                return true;  // the d-pad always moves
-            }
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                assign(keyCode);
-            }
-            return true;
-        }
-        // While not listening: A picks the selected row, B closes.
         if (keyCode == KeyEvent.KEYCODE_BUTTON_A) {
             if (event.getAction() == KeyEvent.ACTION_UP) {
                 View focused = getCurrentFocus();
@@ -282,25 +233,24 @@ final class ControlsDialog extends Dialog {
         return super.dispatchKeyEvent(event);
     }
 
-    /** Analog triggers that don't send key presses count as LT and RT. */
-    @Override
-    public boolean dispatchGenericMotionEvent(MotionEvent event) {
-        if (listening != null
-                && (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK) {
-            float left = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
-                    event.getAxisValue(MotionEvent.AXIS_BRAKE));
-            float right = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
-                    event.getAxisValue(MotionEvent.AXIS_GAS));
-            if (left > 0.5f) {
-                assign(KeyEvent.KEYCODE_BUTTON_L2);
-                return true;
-            }
-            if (right > 0.5f) {
-                assign(KeyEvent.KEYCODE_BUTTON_R2);
-                return true;
-            }
+    /**
+     * The SNES button in its color (a grey pill for L, R, Select and Start), or the icon of an
+     * extra function, {@code sizeDp} tall.
+     */
+    private static View chip(Context context, ControllerMapping.Action action, int sizeDp) {
+        int size = Ui.dp(context, sizeDp);
+        if (action.button == null) {
+            View icon = Ui.faceButton(context, actionIcon(action), actionColor(action), size);
+            icon.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+            return icon;
         }
-        return super.dispatchGenericMotionEvent(event);
+        boolean wide = action.button.length() > 1;
+        TextView chip = Ui.label(context, action.button, sizeDp * (wide ? 0.3f : 0.45f), 0xFFFFFFFF);
+        chip.setGravity(Gravity.CENTER);
+        chip.setBackground(Ui.rounded(chipColor(action), size / 2f));
+        chip.setLayoutParams(new LinearLayout.LayoutParams(
+                wide ? Math.round(size * 1.55f) : size, size));
+        return chip;
     }
 
     static String actionName(Context context, ControllerMapping.Action action) {
