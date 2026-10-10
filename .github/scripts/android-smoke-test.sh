@@ -166,6 +166,20 @@ shot game_landscape
 alive "girar a horizontal"
 adb shell settings put system user_rotation 0
 
+# Library with the test game in it: its card should show the last moment
+# played (saved when leaving the game above).
+adb shell am force-stop "$PKG"
+cat > recent.xml <<XML
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map><string name="games">file://$DIR/smoke.sfc&#9;smoke&#9;$(date +%s)000&#9;SNES&#10;</string></map>
+XML
+adb push recent.xml /data/local/tmp/recent.xml > /dev/null
+adb shell "mkdir -p /data/data/$PKG/shared_prefs && cp /data/local/tmp/recent.xml /data/data/$PKG/shared_prefs/recent.xml && chown -R \$(stat -c %u /data/data/$PKG):\$(stat -c %g /data/data/$PKG) /data/data/$PKG/shared_prefs"
+adb shell am start -W -n "$PKG/.MainActivity"
+sleep 4
+shot library
+alive "mostrar la biblioteca con fotos"
+
 echo "---- Errores en logcat ----"
 adb logcat -d -b crash
 adb logcat -d '*:E' | grep -iE "snes9x|AndroidRuntime|FATAL|DEBUG" | tail -80

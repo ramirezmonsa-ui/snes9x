@@ -197,10 +197,55 @@ public class MainActivity extends Activity {
         return view;
     }
 
+    /** Picture of the moment the game was left, or null if it was never played here. */
+    private android.graphics.Bitmap lastScreen(Game game) {
+        return new SaveSlots(new java.io.File(getFilesDir(), "states"), game.name)
+                .thumbnail(SaveSlots.AUTO);
+    }
+
+    /** An image view showing a game picture with sharp pixels, cropped to fill. */
+    private ImageView screenView(android.graphics.Bitmap picture, float radius) {
+        android.graphics.drawable.BitmapDrawable drawable =
+                new android.graphics.drawable.BitmapDrawable(getResources(), picture);
+        drawable.setFilterBitmap(false);
+        ImageView image = new ImageView(this);
+        image.setImageDrawable(drawable);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        roundCorners(image, radius);
+        return image;
+    }
+
+    private static void roundCorners(View view, float radius) {
+        view.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radius);
+            }
+        });
+        view.setClipToOutline(true);
+    }
+
     private View heroCard(Game game) {
         float radius = Ui.dp(this, 24);
         FrameLayout card = new FrameLayout(this);
-        card.setBackground(Ui.selectable(this, Ui.gradient(Ui.coverColors(game.name), radius), radius));
+        android.graphics.Bitmap screen = lastScreen(game);
+        if (screen != null) {
+            // The last moment played fills the card, darkened at the bottom
+            // so the text reads; the focus outline goes on top of it.
+            card.setMinimumHeight(Ui.dp(this, 200));
+            roundCorners(card, radius);
+            card.addView(screenView(screen, 0), new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            View shade = new View(this);
+            shade.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP,
+                    new int[] {0xE6000000, 0x66000000, 0x00000000}));
+            card.addView(shade, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            card.setForeground(Ui.selectable(this, Ui.rounded(0x00000000, radius), radius));
+        } else {
+            card.setBackground(Ui.selectable(this, Ui.gradient(Ui.coverColors(game.name), radius), radius));
+        }
         card.setFocusable(true);
         card.setClickable(true);
         card.setOnClickListener(v -> play(game));
@@ -209,21 +254,25 @@ public class MainActivity extends Activity {
             return true;
         });
 
-        // Big faded initials as a backdrop.
-        TextView watermark = Ui.text(this, Ui.initials(game.name), 110, 0x33FFFFFF, true);
-        watermark.setIncludeFontPadding(false);
-        FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.END | Gravity.CENTER_VERTICAL);
-        markParams.rightMargin = Ui.dp(this, 16);
-        card.addView(watermark, markParams);
+        if (screen == null) {
+            // Big faded initials as a backdrop.
+            TextView watermark = Ui.text(this, Ui.initials(game.name), 110, 0x33FFFFFF, true);
+            watermark.setIncludeFontPadding(false);
+            FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.END | Gravity.CENTER_VERTICAL);
+            markParams.rightMargin = Ui.dp(this, 16);
+            card.addView(watermark, markParams);
+        }
 
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.VERTICAL);
+        // With a picture behind, the text sits at the bottom over the shade.
+        info.setGravity(screen != null ? Gravity.BOTTOM : Gravity.TOP);
         int pad = Ui.dp(this, 22);
         info.setPadding(pad, pad, pad, pad);
 
-        int textColor = Ui.coverTextColor(game.name);
+        int textColor = screen != null ? 0xFFFFFFFF : Ui.coverTextColor(game.name);
         TextView name = Ui.label(this, game.name, 24, textColor);
         name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
@@ -246,7 +295,8 @@ public class MainActivity extends Activity {
         pillParams.topMargin = Ui.dp(this, 18);
         info.addView(pill, pillParams);
 
-        card.addView(info);
+        card.addView(info, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         return card;
     }
 
@@ -299,9 +349,17 @@ public class MainActivity extends Activity {
             return true;
         });
 
-        TextView cover = Ui.label(this, Ui.initials(game.name), 38, Ui.coverTextColor(game.name));
-        cover.setGravity(Gravity.CENTER);
-        cover.setBackground(Ui.gradient(Ui.coverColors(game.name), Ui.dp(this, 14)));
+        // The last moment played, or colored initials for games never opened.
+        android.graphics.Bitmap screen = lastScreen(game);
+        View cover;
+        if (screen != null) {
+            cover = screenView(screen, Ui.dp(this, 14));
+        } else {
+            TextView initials = Ui.label(this, Ui.initials(game.name), 38, Ui.coverTextColor(game.name));
+            initials.setGravity(Gravity.CENTER);
+            initials.setBackground(Ui.gradient(Ui.coverColors(game.name), Ui.dp(this, 14)));
+            cover = initials;
+        }
         card.addView(cover, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 110)));
 

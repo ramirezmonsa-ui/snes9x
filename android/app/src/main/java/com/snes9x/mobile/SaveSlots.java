@@ -16,7 +16,10 @@ final class SaveSlots {
     static final int AUTO = 0;
     static final int COUNT = 5;
 
-    private static final int THUMBNAIL_WIDTH = 240;
+    // Pictures are kept at the console's own resolution (256 wide on the
+    // SNES, 240 on the GBA) so the pixels stay sharp; hi-res SNES frames
+    // (512 wide) are halved.
+    private static final int THUMBNAIL_MAX_WIDTH = 256;
 
     private final File dir;
     private final String game;
@@ -66,9 +69,12 @@ final class SaveSlots {
             thumbnail.delete();
             return true;
         }
-        int height = Math.max(1, Math.round(
-                (float) picture.getHeight() * THUMBNAIL_WIDTH / picture.getWidth()));
-        Bitmap small = Bitmap.createScaledBitmap(picture, THUMBNAIL_WIDTH, height, true);
+        Bitmap small = picture;
+        if (picture.getWidth() > THUMBNAIL_MAX_WIDTH) {
+            int height = Math.max(1, Math.round(
+                    (float) picture.getHeight() * THUMBNAIL_MAX_WIDTH / picture.getWidth()));
+            small = Bitmap.createScaledBitmap(picture, THUMBNAIL_MAX_WIDTH, height, true);
+        }
         File temp = new File(thumbnail.getPath() + ".tmp");
         try (FileOutputStream out = new FileOutputStream(temp)) {
             small.compress(Bitmap.CompressFormat.PNG, 100, out);
