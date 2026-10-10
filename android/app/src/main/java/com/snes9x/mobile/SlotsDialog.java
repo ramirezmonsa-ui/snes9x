@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.format.DateUtils;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -142,7 +143,12 @@ final class SlotsDialog {
                 : context.getString(R.string.slot_number, slot);
         TextView label = Ui.label(context, name, 14, Ui.TEXT);
         label.setPadding(Ui.dp(context, 4), Ui.dp(context, 6), 0, 0);
-        card.addView(label);
+        // One line: on narrow phones "Automático" shrinks instead of wrapping.
+        label.setMaxLines(1);
+        label.setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, TypedValue.COMPLEX_UNIT_SP);
+        // Auto-sizing needs a fixed height to fit the text into.
+        card.addView(label, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(context, 26)));
 
         long time = slots.time(slot);
         TextView when = Ui.text(context, time > 0
