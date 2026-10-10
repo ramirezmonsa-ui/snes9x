@@ -40,8 +40,8 @@ Si el control tiene varios modos, elige el modo **Xbox / XInput** o **HID**:
 el modo PS en algunos celulares cambia el orden de los botones.
 
 Cada botón se puede cambiar en **Configurar control** (botón "Control" en la
-pantalla de inicio, o en el menú de pausa): aparece un dibujo de un control
-de SNES, tocas un botón del dibujo y presionas el botón de tu control que
+pantalla de inicio, o en el menú de pausa): aparece una imagen de un control
+de SNES, tocas un botón de la imagen y presionas el botón de tu control que
 quieras usar. Debajo están las funciones extra (avance rápido, rebobinar y
 abrir el menú).
 
