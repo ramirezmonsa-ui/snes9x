@@ -13,6 +13,12 @@ on:
       - '.github/scripts/android-smoke-test.sh'
   workflow_dispatch:
 
+# One run at a time per branch, and a new push cancels the older run, so an
+# older build can never be published after a newer one and become "latest".
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
