@@ -45,9 +45,13 @@
     <string name="controls_title">Configurar control</string>
     <string name="controls_short">Control</string>
     <string name="controls_menu_detail">Elegir qué hace cada botón</string>
-    <string name="controls_hint">Toca una acción y después presiona el botón del control que quieras usar.</string>
+    <string name="controls_hint">Toca un botón del dibujo y después presiona el botón de tu control que quieras usar.</string>
     <string name="controls_listening">Presiona el botón para «%1$s». Atrás para cancelar.</string>
-    <string name="controls_paddles">¿Botones traseros (M1/M2)? Primero prográmalos en el control para que copien otro botón. En la EasySMX M15: mantén FN + M1 dos segundos, aprieta la palanca izquierda (L3) y vuelve a tocar M1. Haz lo mismo con M2 y la palanca derecha (R3). Ya vienen asignados: L3 rebobina y R3 es avance rápido.</string>
+    <string name="controls_paddles">Algunos controles tienen botones traseros o extra (M1, M2, paletas…) que no envían nada por sí solos: hay que configurarlos en el propio control para que copien otro botón (mira el manual de tu control). Un buen truco es que copien L3 o R3 (apretar las palancas), que estos juegos no usan: en esta app L3 ya rebobina y R3 hace avance rápido.</string>
+    <string name="controls_info_title">Botones traseros y extra</string>
+    <string name="controls_ok">Entendido</string>
+    <string name="controls_extra">Funciones extra</string>
+    <string name="controls_dpad">La cruceta y la palanca izquierda siempre sirven para moverse.</string>
     <string name="controls_press">Presiona un botón…</string>
     <string name="controls_none">Sin asignar</string>
     <string name="controls_reset">Restablecer</string>

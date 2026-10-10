@@ -29,28 +29,28 @@ En el juego, el botón de **pausa** (arriba), el botón **Atrás** o el botón
 mostrar u ocultar los controles táctiles, reiniciar y salir. Con un control
 se navega con la cruceta, **A** elige y **B** cierra.
 
-## Jugar con un control (por ejemplo EasySMX M15)
+## Jugar con un control
 
+Sirve cualquier control Bluetooth o USB que funcione en Android (Xbox,
+PlayStation, 8BitDo, EasySMX, controles tipo "telescópicos" para celular…).
 Cuando conectas un control, la app lo detecta sola y oculta los botones
 táctiles. Si lo desconectas, vuelven a aparecer.
 
-Con el **EasySMX M15** (se conecta por el puerto USB-C del celular):
-
-1. Pon el control en **modo HID** (mantén **FN + A**; la luz queda amarilla)
-   o en **modo Xbox** (mantén **FN + TURBO**; la luz queda morada). Evita el
-   modo PS, porque en algunos celulares cambia el orden de los botones.
-2. Abre el control, coloca el celular y ciérralo.
-3. Abre un juego en la app.
+Si el control tiene varios modos, elige el modo **Xbox / XInput** o **HID**:
+el modo PS en algunos celulares cambia el orden de los botones.
 
 Cada botón se puede cambiar en **Configurar control** (botón "Control" en la
-pantalla de inicio, o en el menú de pausa): tocas una acción y presionas el
-botón que quieras.
+pantalla de inicio, o en el menú de pausa): aparece un dibujo de un control
+de SNES, tocas un botón del dibujo y presionas el botón de tu control que
+quieras usar. Debajo están las funciones extra (avance rápido, rebobinar y
+abrir el menú).
 
-**Botones traseros M1/M2 de la EasySMX M15:** no mandan nada por sí solos,
-hay que programarlos en el control para que copien otro botón. Mantén
-**FN + M1** dos segundos, aprieta la palanca izquierda (**L3**) y toca **M1**
-otra vez; lo mismo con **M2** y la palanca derecha (**R3**). En la app, L3
-rebobina y R3 es avance rápido (se puede cambiar).
+**Botones traseros (M1/M2, paletas…):** en la mayoría de los controles no
+mandan nada por sí solos; hay que programarlos en el propio control para que
+copien otro botón (la **i** de la pantalla de configuración lo explica). Lo
+más cómodo es que copien **L3** y **R3** (apretar las palancas): en la app,
+L3 rebobina y R3 es avance rápido. Por ejemplo, en la EasySMX M15: mantén
+**FN + M1** dos segundos, aprieta L3 y toca M1 otra vez; lo mismo con M2 y R3.
 
 De fábrica, los botones funcionan por posición, igual que en el control de SNES:
 

@@ -19,11 +19,18 @@ import android.widget.TextView;
 import java.util.List;
 
 /**
- * Lets the player choose which controller button does each action: tap an action, then press
- * the button for it.
+ * Lets the player choose which controller button does each action: tap a button on the drawing
+ * of the controller (or one of the extra functions below it), then press the button for it.
  */
 final class ControlsDialog extends Dialog {
+    /** Actions that aren't on the SNES controller, listed under the drawing. */
+    private static final ControllerMapping.Action[] EXTRAS = {
+        ControllerMapping.Action.FAST_FORWARD, ControllerMapping.Action.REWIND,
+        ControllerMapping.Action.MENU,
+    };
+
     private final ControllerMapping mapping;
+    private final ControllerDiagramView diagram;
     private final LinearLayout list;
     private final TextView hint;
 
@@ -42,24 +49,63 @@ final class ControlsDialog extends Dialog {
         panel.setPadding(pad, pad, pad, Ui.dp(context, 12));
         panel.setBackground(ActionSheet.panelBackground(context));
 
-        panel.addView(Ui.label(context, context.getString(R.string.controls_title), 24, Ui.TEXT));
+        // Title, with an (i) for the tip about extra buttons.
+        LinearLayout header = new LinearLayout(context);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(Ui.label(context, context.getString(R.string.controls_title), 24, Ui.TEXT),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        TextView info = Ui.label(context, "i", 18, 0xFFFFFFFF);
+        info.setGravity(Gravity.CENTER);
+        info.setTypeface(android.graphics.Typeface.create("serif", android.graphics.Typeface.BOLD_ITALIC));
+        float infoRadius = Ui.dp(context, 17);
+        info.setBackground(Ui.selectable(context, Ui.rounded(Ui.SHELL, infoRadius), infoRadius));
+        info.setFocusable(true);
+        info.setClickable(true);
+        info.setContentDescription(context.getString(R.string.controls_info_title));
+        info.setOnClickListener(v -> new ActionSheet(context)
+                .title(context.getString(R.string.controls_info_title))
+                .subtitle(context.getString(R.string.controls_paddles))
+                .action(Ui.GREEN, R.drawable.ic_play, context.getString(R.string.controls_ok), null)
+                .show());
+        header.addView(info, new LinearLayout.LayoutParams(Ui.dp(context, 34), Ui.dp(context, 34)));
+        panel.addView(header);
+
         hint = Ui.text(context, context.getString(R.string.controls_hint), 14, Ui.TEXT_DIM, false);
-        hint.setPadding(0, Ui.dp(context, 2), 0, Ui.dp(context, 4));
+        hint.setPadding(0, Ui.dp(context, 2), 0, Ui.dp(context, 8));
         panel.addView(hint);
-        TextView paddles = Ui.text(context, context.getString(R.string.controls_paddles), 13,
-                Ui.TEXT_DIM, false);
-        paddles.setPadding(Ui.dp(context, 12), Ui.dp(context, 8), Ui.dp(context, 12), Ui.dp(context, 8));
-        paddles.setBackground(Ui.rounded(Ui.BACKGROUND, Ui.dp(context, 12)));
-        LinearLayout.LayoutParams paddlesParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        paddlesParams.topMargin = Ui.dp(context, 8);
-        paddlesParams.bottomMargin = Ui.dp(context, 8);
-        panel.addView(paddles, paddlesParams);
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        diagram = new ControllerDiagramView(context);
+        diagram.setLabels(action -> keysText(context, action));
+        diagram.setListener(new ControllerDiagramView.Listener() {
+            @Override
+            public void onButtonPicked(ControllerMapping.Action action) {
+                startListening(action, null);
+            }
+
+            @Override
+            public void onDpadPicked() {
+                stopListening();
+                hint.setText(R.string.controls_dpad);
+            }
+        });
+        content.addView(diagram, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView extras = Ui.label(context, context.getString(R.string.controls_extra), 14, Ui.TEXT_DIM);
+        extras.setAllCaps(true);
+        extras.setLetterSpacing(0.08f);
+        extras.setPadding(0, Ui.dp(context, 10), 0, Ui.dp(context, 2));
+        content.addView(extras);
 
         list = new LinearLayout(context);
         list.setOrientation(LinearLayout.VERTICAL);
+        content.addView(list);
+
         ScrollView scroll = new ScrollView(context);
-        scroll.addView(list);
+        scroll.addView(content);
         panel.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
 
@@ -89,20 +135,18 @@ final class ControlsDialog extends Dialog {
         super.show();
         if (window != null) {
             int screenWidth = getContext().getResources().getDisplayMetrics().widthPixels;
-            int screenHeight = getContext().getResources().getDisplayMetrics().heightPixels;
-            window.setLayout(Math.min(screenWidth - Ui.dp(getContext(), 32), Ui.dp(getContext(), 460)),
-                    Math.min(screenHeight - Ui.dp(getContext(), 48), Ui.dp(getContext(), 640)));
+            window.setLayout(Math.min(screenWidth - Ui.dp(getContext(), 24), Ui.dp(getContext(), 520)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
             window.setGravity(Gravity.CENTER);
         }
-        if (list.getChildCount() > 0) {
-            Ui.focusForKeys(list.getChildAt(0));
-        }
+        Ui.focusForKeys(diagram);
     }
 
     private void refresh() {
+        diagram.invalidate();
         list.removeAllViews();
         Context context = getContext();
-        for (ControllerMapping.Action action : ControllerMapping.Action.values()) {
+        for (ControllerMapping.Action action : EXTRAS) {
             list.addView(row(context, action));
         }
     }
@@ -166,8 +210,11 @@ final class ControlsDialog extends Dialog {
         stopListening();
         listening = action;
         listeningLabel = label;
-        label.setText(R.string.controls_press);
-        label.setTextColor(Ui.RED);
+        if (label != null) {
+            label.setText(R.string.controls_press);
+            label.setTextColor(Ui.RED);
+        }
+        diagram.setSelected(action);
         hint.setText(getContext().getString(R.string.controls_listening,
                 actionName(getContext(), action)));
     }
@@ -175,6 +222,7 @@ final class ControlsDialog extends Dialog {
     private void stopListening() {
         listening = null;
         listeningLabel = null;
+        diagram.setSelected(null);
         hint.setText(R.string.controls_hint);
     }
 
