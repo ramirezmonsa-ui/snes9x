@@ -78,7 +78,6 @@ final class ControlsDialog extends Dialog {
         content.setOrientation(LinearLayout.VERTICAL);
 
         diagram = new ControllerDiagramView(context);
-        diagram.setLabels(action -> keysText(context, action));
         diagram.setListener(new ControllerDiagramView.Listener() {
             @Override
             public void onButtonPicked(ControllerMapping.Action action) {
@@ -216,7 +215,7 @@ final class ControlsDialog extends Dialog {
         }
         diagram.setSelected(action);
         hint.setText(getContext().getString(R.string.controls_listening,
-                actionName(getContext(), action)));
+                actionName(getContext(), action), keysText(getContext(), action)));
     }
 
     private void stopListening() {

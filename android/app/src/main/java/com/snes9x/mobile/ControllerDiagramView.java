@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.graphics.Typeface;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
@@ -16,8 +15,7 @@ import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * A picture of a Super Nintendo controller with a badge on each button showing which button of
- * the player's controller presses it. Tapping a button picks it to be changed.
+ * A picture of a Super Nintendo controller. Tapping a button picks it to be changed.
  */
 final class ControllerDiagramView extends View {
     interface Listener {
@@ -27,23 +25,16 @@ final class ControllerDiagramView extends View {
         void onDpadPicked();
     }
 
-    /** Text for each badge: the controller button that presses it. */
-    interface Labels {
-        String keysFor(ControllerMapping.Action action);
-    }
-
     /** Where a button is on the picture, in layout units (the view is 100 units wide). */
     private static final class Spot {
         final float x;
         final float y;
         final float minWidth;
-        final int color;
 
-        Spot(float x, float y, float minWidth, int color) {
+        Spot(float x, float y, float minWidth) {
             this.x = x;
             this.y = y;
             this.minWidth = minWidth;
-            this.color = color;
         }
     }
 
@@ -59,12 +50,10 @@ final class ControllerDiagramView extends View {
     // badges fit.
     private static final float PICTURE_TOP = 4;
     private static final float HEIGHT = 50;
-    private static final float BADGE_HEIGHT = 6.4f;
     private static final float DPAD_X = 21.6f;
     private static final float DPAD_Y = 27.4f;
     private static final float DPAD_R = 8.5f;
     private static final float FACE_R = 3.5f;
-    private static final int BADGE_DARK = 0xE6404045;
 
     private final Map<ControllerMapping.Action, Spot> spots =
             new EnumMap<>(ControllerMapping.Action.class);
@@ -72,12 +61,9 @@ final class ControllerDiagramView extends View {
     private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
-    private final RectF ring = new RectF();
 
     private Listener listener;
-    private Labels labels;
     private ControllerMapping.Action selected;
     private int keyboardIndex;
 
@@ -85,28 +71,21 @@ final class ControllerDiagramView extends View {
         super(context);
         picture = BitmapFactory.decodeResource(context.getResources(), R.drawable.controller_picture);
         stroke.setStyle(Paint.Style.STROKE);
-        text.setTextAlign(Paint.Align.CENTER);
-        text.setTypeface(Typeface.DEFAULT_BOLD);
         setFocusable(true);
         setClickable(true);
 
-        spots.put(ControllerMapping.Action.L, new Spot(23.2f, 5.2f, 11, BADGE_DARK));
-        spots.put(ControllerMapping.Action.R, new Spot(76.8f, 5.2f, 11, BADGE_DARK));
-        spots.put(ControllerMapping.Action.SELECT, new Spot(36.5f, 35.5f, 9, BADGE_DARK));
-        spots.put(ControllerMapping.Action.START, new Spot(55.5f, 35.5f, 9, BADGE_DARK));
-        spots.put(ControllerMapping.Action.X, new Spot(78.2f, 19.4f, 2 * FACE_R, Ui.BLUE));
-        spots.put(ControllerMapping.Action.Y, new Spot(68.9f, 26.6f, 2 * FACE_R, Ui.GREEN));
-        spots.put(ControllerMapping.Action.A, new Spot(87.7f, 26.4f, 2 * FACE_R, Ui.RED));
-        spots.put(ControllerMapping.Action.B, new Spot(78.4f, 33.7f, 2 * FACE_R, Ui.YELLOW));
+        spots.put(ControllerMapping.Action.L, new Spot(23.2f, 5.2f, 16));
+        spots.put(ControllerMapping.Action.R, new Spot(76.8f, 5.2f, 16));
+        spots.put(ControllerMapping.Action.SELECT, new Spot(41, 29.7f, 8));
+        spots.put(ControllerMapping.Action.START, new Spot(51.5f, 29.9f, 8));
+        spots.put(ControllerMapping.Action.X, new Spot(78.2f, 19.4f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.Y, new Spot(68.9f, 26.6f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.A, new Spot(87.7f, 26.4f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.B, new Spot(78.4f, 33.7f, 2 * FACE_R));
     }
 
     void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    void setLabels(Labels labels) {
-        this.labels = labels;
-        invalidate();
     }
 
     void setSelected(ControllerMapping.Action action) {
@@ -138,48 +117,31 @@ final class ControllerDiagramView extends View {
             canvas.drawBitmap(picture, null, rect, bitmapPaint);
         }
         for (ControllerMapping.Action action : ORDER) {
-            drawBadge(canvas, action, spots.get(action), u);
+            drawRing(canvas, action, spots.get(action), u);
         }
     }
 
-    /** A pill over the button, in its color, with the controller key that presses it. */
-    private void drawBadge(Canvas canvas, ControllerMapping.Action action, Spot spot, float u) {
+    /**
+     * Nothing is drawn over the picture except a ring around the button being changed (red) or
+     * the one a controller's d-pad is on (blue).
+     */
+    private void drawRing(Canvas canvas, ControllerMapping.Action action, Spot spot, float u) {
         boolean picked = action == selected;
         boolean focusedHere = isFocused() && ORDER[keyboardIndex] == action;
-        String keys = labels != null ? labels.keysFor(action) : "";
-        String shown = picked ? "?" : keys;
-        text.setTextSize(3.5f * u);
-        float padding = 2.4f * u;
-        float maxWidth = 22 * u;
-        while (shown.length() > 1 && text.measureText(shown) + padding > maxWidth) {
-            shown = shown.substring(0, shown.length() - 2) + "…";
+        if (!picked && !focusedHere) {
+            return;
         }
-        float width = Math.max(spot.minWidth * u, text.measureText(shown) + padding);
-        float height = BADGE_HEIGHT * u;
-        rect.set(spot.x * u - width / 2, spot.y * u - height / 2,
-                spot.x * u + width / 2, spot.y * u + height / 2);
-        float radius = height / 2;
-
-        if (picked || focusedHere) {
-            // A ring around the badge: red while waiting for a button, blue
-            // for the one a controller's d-pad is on.
-            float out = 1.3f * u;
-            ring.set(rect.left - out, rect.top - out, rect.right + out, rect.bottom + out);
-            fill.setColor(0xFFFFFFFF);
-            canvas.drawRoundRect(ring, radius + out, radius + out, fill);
-            stroke.setColor(picked ? Ui.RED : Ui.FOCUS);
-            stroke.setStrokeWidth(0.9f * u);
-            canvas.drawRoundRect(ring, radius + out, radius + out, stroke);
-        }
-
-        fill.setColor(spot.color);
-        canvas.drawRoundRect(rect, radius, radius, fill);
+        boolean round = spot.minWidth <= 2 * FACE_R;
+        float halfWidth = (round ? FACE_R + 1.4f : spot.minWidth / 2 + 1) * u;
+        float halfHeight = (round ? FACE_R + 1.4f : 3.2f) * u;
+        rect.set(spot.x * u - halfWidth, spot.y * u - halfHeight,
+                spot.x * u + halfWidth, spot.y * u + halfHeight);
         stroke.setColor(0xFFFFFFFF);
-        stroke.setStrokeWidth(0.5f * u);
-        canvas.drawRoundRect(rect, radius, radius, stroke);
-
-        text.setColor(spot.color == Ui.YELLOW ? Ui.TEXT : 0xFFFFFFFF);
-        canvas.drawText(shown, rect.centerX(), rect.centerY() + 1.25f * u, text);
+        stroke.setStrokeWidth(1.8f * u);
+        canvas.drawRoundRect(rect, halfHeight, halfHeight, stroke);
+        stroke.setColor(picked ? Ui.RED : Ui.FOCUS);
+        stroke.setStrokeWidth(0.9f * u);
+        canvas.drawRoundRect(rect, halfHeight, halfHeight, stroke);
     }
 
     // --- Picking -------------------------------------------------------------
