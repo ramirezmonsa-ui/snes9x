@@ -51,19 +51,24 @@ final class ControllerDiagramView extends View {
 
     // Order used when moving between buttons with a controller's d-pad.
     private static final ControllerMapping.Action[] ORDER = {
-        ControllerMapping.Action.L, ControllerMapping.Action.R,
-        ControllerMapping.Action.X, ControllerMapping.Action.Y,
-        ControllerMapping.Action.A, ControllerMapping.Action.SELECT,
-        ControllerMapping.Action.START, ControllerMapping.Action.B,
+        ControllerMapping.Action.L, ControllerMapping.Action.Y,
+        ControllerMapping.Action.R, ControllerMapping.Action.X,
+        ControllerMapping.Action.A, ControllerMapping.Action.B,
+        ControllerMapping.Action.SELECT, ControllerMapping.Action.START,
     };
 
-    private static final float HEIGHT = 66;
-    private static final float DPAD_X = 30;
-    private static final float DPAD_Y = 34;
-    private static final float FACE_X = 68;
-    private static final float FACE_Y = 34;
-    private static final float FACE_GAP = 7.2f;
-    private static final float FACE_R = 3.7f;
+    // The controller sits on the left; the boxes go above it, in a column on
+    // its right and below it, big enough to read on a phone.
+    private static final float HEIGHT = 77;
+    private static final RectF BODY = new RectF(4, 20, 70, 56);
+    private static final float DPAD_X = 21;
+    private static final float DPAD_Y = 38;
+    private static final float DPAD_R = 8.5f;
+    private static final float FACE_X = 52;
+    private static final float FACE_Y = 38;
+    private static final float FACE_GAP = 6.2f;
+    private static final float FACE_R = 3.3f;
+    private static final float SHELL_R = 11;
 
     private final Map<ControllerMapping.Action, Callout> callouts =
             new EnumMap<>(ControllerMapping.Action.class);
@@ -85,29 +90,29 @@ final class ControllerDiagramView extends View {
         setFocusable(true);
         setClickable(true);
 
-        // Shoulders, with their boxes above.
-        callouts.put(ControllerMapping.Action.L, new Callout(new RectF(17, 10, 39, 17), false,
-                new RectF(18, 1, 32, 8), new float[] {25, 8, 25, 10}, 0));
-        callouts.put(ControllerMapping.Action.R, new Callout(new RectF(61, 10, 83, 17), false,
-                new RectF(68, 1, 82, 8), new float[] {75, 8, 75, 10}, 0));
-        // Face buttons: X and Y labelled to the left, A to the right, B below.
-        callouts.put(ControllerMapping.Action.X, new Callout(face(0, -1), true,
-                new RectF(46.5f, 23.3f, 60.5f, 30.3f),
-                new float[] {60.5f, FACE_Y - FACE_GAP, FACE_X - FACE_R, FACE_Y - FACE_GAP}, Ui.BLUE));
+        // Top row: L and Y; R starts the column on the right.
+        callouts.put(ControllerMapping.Action.L, new Callout(new RectF(8, 15, 28, 23), false,
+                new RectF(4, 3, 27, 12), new float[] {18, 12, 18, 15}, 0));
         callouts.put(ControllerMapping.Action.Y, new Callout(face(-1, 0), true,
-                new RectF(39.5f, 30.5f, 53.5f, 37.5f),
-                new float[] {53.5f, FACE_Y, FACE_X - FACE_GAP - FACE_R, FACE_Y}, Ui.GREEN));
+                new RectF(30, 3, 53, 12),
+                new float[] {FACE_X - FACE_GAP, FACE_Y - FACE_R, FACE_X - FACE_GAP, 12}, Ui.GREEN));
+        callouts.put(ControllerMapping.Action.R, new Callout(new RectF(47, 15, 67, 23), false,
+                new RectF(76, 3, 99, 12), new float[] {76, 7.5f, 66, 16}, 0));
+        callouts.put(ControllerMapping.Action.X, new Callout(face(0, -1), true,
+                new RectF(76, 19, 99, 28),
+                new float[] {FACE_X + FACE_R, FACE_Y - FACE_GAP, 76, 23.5f}, Ui.BLUE));
         callouts.put(ControllerMapping.Action.A, new Callout(face(1, 0), true,
-                new RectF(85.5f, 30.5f, 99.5f, 37.5f),
-                new float[] {FACE_X + FACE_GAP + FACE_R, FACE_Y, 85.5f, FACE_Y}, Ui.RED));
+                new RectF(76, 33.5f, 99, 42.5f),
+                new float[] {FACE_X + FACE_GAP + FACE_R, FACE_Y, 76, FACE_Y}, Ui.RED));
         callouts.put(ControllerMapping.Action.B, new Callout(face(0, 1), true,
-                new RectF(61, 57, 75, 64),
-                new float[] {FACE_X, FACE_Y + FACE_GAP + FACE_R, FACE_X, 57}, Ui.YELLOW));
-        // Select and Start, labelled below.
-        callouts.put(ControllerMapping.Action.SELECT, new Callout(new RectF(38, 40.6f, 46, 43.4f),
-                false, new RectF(29, 57, 43, 64), new float[] {42, 43.4f, 42, 57}, 0));
-        callouts.put(ControllerMapping.Action.START, new Callout(new RectF(48, 40.6f, 56, 43.4f),
-                false, new RectF(45, 57, 59, 64), new float[] {52, 43.4f, 52, 57}, 0));
+                new RectF(76, 48, 99, 57),
+                new float[] {FACE_X + FACE_R, FACE_Y + FACE_GAP, 76, 52.5f}, Ui.YELLOW));
+        // Select and Start, slanted between the d-pad and the face buttons,
+        // with their boxes below the controller.
+        callouts.put(ControllerMapping.Action.SELECT, new Callout(new RectF(31, 42.7f, 37, 45.3f),
+                false, new RectF(10, 66, 33, 75), new float[] {33, 45, 21.5f, 66}, 0));
+        callouts.put(ControllerMapping.Action.START, new Callout(new RectF(39, 42.7f, 45, 45.3f),
+                false, new RectF(37, 66, 60, 75), new float[] {41, 45, 48.5f, 66}, 0));
     }
 
     private static RectF face(int dx, int dy) {
@@ -163,22 +168,23 @@ final class ControllerDiagramView extends View {
         }
 
         // Body, in the warm grey of the original controller.
-        scaled.set(12 * u, 14 * u, 88 * u, 54 * u);
+        float corner = BODY.height() / 2 * u;
+        scale(BODY, u);
         fill.setColor(0xFFDCD9D3);
-        canvas.drawRoundRect(scaled, 20 * u, 20 * u, fill);
+        canvas.drawRoundRect(scaled, corner, corner, fill);
         stroke.setColor(0xFFB8B4AD);
         stroke.setStrokeWidth(0.4f * u);
-        canvas.drawRoundRect(scaled, 20 * u, 20 * u, stroke);
+        canvas.drawRoundRect(scaled, corner, corner, stroke);
 
         // D-pad in its round recess.
         fill.setColor(0xFFD0CDC7);
-        canvas.drawCircle(DPAD_X * u, DPAD_Y * u, 10 * u, fill);
+        canvas.drawCircle(DPAD_X * u, DPAD_Y * u, DPAD_R * u, fill);
         stroke.setColor(0xFFC2BEB7);
         stroke.setStrokeWidth(0.35f * u);
-        canvas.drawCircle(DPAD_X * u, DPAD_Y * u, 10 * u, stroke);
+        canvas.drawCircle(DPAD_X * u, DPAD_Y * u, DPAD_R * u, stroke);
         fill.setColor(0xFF77767B);
-        float arm = 2.7f * u;
-        float reach = 8 * u;
+        float arm = 2.3f * u;
+        float reach = 6.8f * u;
         scaled.set(DPAD_X * u - arm, DPAD_Y * u - reach, DPAD_X * u + arm, DPAD_Y * u + reach);
         canvas.drawRoundRect(scaled, 0.8f * u, 0.8f * u, fill);
         scaled.set(DPAD_X * u - reach, DPAD_Y * u - arm, DPAD_X * u + reach, DPAD_Y * u + arm);
@@ -187,7 +193,7 @@ final class ControllerDiagramView extends View {
         // Dark grey shell behind the face buttons, with the two diagonal
         // grooves joining Y to X and B to A.
         fill.setColor(0xFF8C8A8F);
-        canvas.drawCircle(FACE_X * u, FACE_Y * u, 12.5f * u, fill);
+        canvas.drawCircle(FACE_X * u, FACE_Y * u, SHELL_R * u, fill);
         fill.setColor(0xFFCFCCC6);
         float grooveHalf = (FACE_GAP * 0.7071f + FACE_R + 0.9f) * u;
         float grooveWidth = (FACE_R + 0.9f) * u;
@@ -226,7 +232,7 @@ final class ControllerDiagramView extends View {
             fill.setColor(callout.color);
             canvas.drawCircle(r.centerX(), r.centerY(), r.width() / 2, fill);
             text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC));
-            text.setTextSize(3.4f * u);
+            text.setTextSize(3.2f * u);
             text.setColor(0xFFFFFFFF);
             canvas.drawText(action.button, r.centerX(), r.centerY() + 1.2f * u, text);
         } else if (action == ControllerMapping.Action.SELECT || action == ControllerMapping.Action.START) {
@@ -240,10 +246,10 @@ final class ControllerDiagramView extends View {
             text.setTextSize(2.2f * u);
             text.setColor(0xFF4A494E);
             canvas.drawText(action.button.toUpperCase(java.util.Locale.ROOT), r.centerX(),
-                    r.bottom + 4.2f * u, text);
+                    r.bottom + 4.4f * u, text);
         } else {
             text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC));
-            text.setTextSize(3.4f * u);
+            text.setTextSize(3.2f * u);
             text.setColor(Ui.TEXT);
             canvas.drawText(action.button, r.centerX(), r.centerY() + 1.2f * u, text);
         }
@@ -251,46 +257,54 @@ final class ControllerDiagramView extends View {
 
     /** The label: a small copy of the SNES button, then the controller key that presses it. */
     private void drawBox(Canvas canvas, ControllerMapping.Action action, Callout callout, float u) {
-        RectF box = scale(callout.box, u);
-        float radius = 1.6f * u;
+        RectF box = new RectF(scale(callout.box, u));
+        float radius = 2.2f * u;
         fill.setColor(Ui.SURFACE);
         canvas.drawRoundRect(box, radius, radius, fill);
         boolean picked = action == selected;
         boolean focusedHere = isFocused() && ORDER[keyboardIndex] == action;
         stroke.setColor(picked ? Ui.RED : focusedHere ? Ui.FOCUS : 0xFFB9B6B1);
-        stroke.setStrokeWidth((picked || focusedHere ? 0.7f : 0.3f) * u);
+        stroke.setStrokeWidth((picked || focusedHere ? 0.8f : 0.35f) * u);
         canvas.drawRoundRect(box, radius, radius, stroke);
 
         // Chip with the SNES button.
-        float chipX = box.left + 3.4f * u;
+        float chipX = box.left + 4.3f * u;
         float cy = box.centerY();
+        text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC));
+        text.setColor(0xFFFFFFFF);
         if (callout.round) {
             fill.setColor(callout.color);
-            canvas.drawCircle(chipX, cy, 2.3f * u, fill);
-            text.setColor(0xFFFFFFFF);
+            canvas.drawCircle(chipX, cy, 3 * u, fill);
+            text.setTextSize(3.6f * u);
+            canvas.drawText(action.button, chipX, cy + 1.3f * u, text);
+        } else if (action == ControllerMapping.Action.SELECT
+                || action == ControllerMapping.Action.START) {
+            fill.setColor(0xFF77767B);
+            canvas.save();
+            canvas.rotate(-35, chipX, cy);
+            scaled.set(chipX - 3 * u, cy - 1.2f * u, chipX + 3 * u, cy + 1.2f * u);
+            canvas.drawRoundRect(scaled, 1.2f * u, 1.2f * u, fill);
+            canvas.restore();
         } else {
             fill.setColor(Ui.SHELL);
-            scaled.set(chipX - 2.5f * u, cy - 1.8f * u, chipX + 2.5f * u, cy + 1.8f * u);
-            canvas.drawRoundRect(scaled, 0.9f * u, 0.9f * u, fill);
-            text.setColor(0xFFFFFFFF);
+            scaled.set(chipX - 3 * u, cy - 2.3f * u, chipX + 3 * u, cy + 2.3f * u);
+            canvas.drawRoundRect(scaled, 1.1f * u, 1.1f * u, fill);
+            text.setTextSize(3.6f * u);
+            canvas.drawText(action.button, chipX, cy + 1.3f * u, text);
         }
-        String chip = action == ControllerMapping.Action.SELECT ? "SE"
-                : action == ControllerMapping.Action.START ? "ST" : action.button;
-        text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC));
-        text.setTextSize((chip.length() > 1 ? 2 : 2.8f) * u);
-        canvas.drawText(chip, chipX, cy + 1f * u, text);
 
         // The controller key(s).
         String keys = labels != null ? labels.keysFor(action) : "";
         text.setTypeface(Typeface.DEFAULT_BOLD);
-        text.setTextSize(2.7f * u);
+        text.setTextSize(3.9f * u);
         text.setColor(picked ? Ui.RED : Ui.TEXT);
-        float available = box.right - (chipX + 2.8f * u) - 0.8f * u;
+        float left = chipX + 3.6f * u;
+        float available = box.right - left - 1f * u;
         String shown = keys;
         while (shown.length() > 1 && text.measureText(shown) > available) {
-            shown = shown.substring(0, shown.length() - 2) + "…";
+            shown = shown.substring(0, shown.length() - 2) + "\u2026";
         }
-        canvas.drawText(shown, (chipX + 2.8f * u + box.right) / 2, cy + 0.95f * u, text);
+        canvas.drawText(shown, (left + box.right) / 2, cy + 1.4f * u, text);
     }
 
     // --- Picking -------------------------------------------------------------
@@ -310,7 +324,7 @@ final class ControllerDiagramView extends View {
             if (listener != null) {
                 listener.onButtonPicked(hit);
             }
-        } else if (Math.hypot(x - DPAD_X, y - DPAD_Y) < 10 && listener != null) {
+        } else if (Math.hypot(x - DPAD_X, y - DPAD_Y) < DPAD_R && listener != null) {
             listener.onDpadPicked();
         }
         return true;
