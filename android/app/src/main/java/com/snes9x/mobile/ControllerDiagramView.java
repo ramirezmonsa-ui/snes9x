@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
-import android.graphics.Typeface;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
@@ -51,11 +50,10 @@ final class ControllerDiagramView extends View {
     // badges fit.
     private static final float PICTURE_TOP = 4;
     private static final float HEIGHT = 50;
-    private static final float DPAD_X = 21.6f;
-    private static final float DPAD_Y = 27.4f;
-    private static final float DPAD_R = 8.5f;
+    private static final float DPAD_X = 21.4f;
+    private static final float DPAD_Y = 26.2f;
+    private static final float DPAD_R = 9.5f;
     private static final float FACE_R = 3.5f;
-    private static final int BODY = 0xFFB8B9BD;    // the picture's plastic
 
     private final Map<ControllerMapping.Action, Spot> spots =
             new EnumMap<>(ControllerMapping.Action.class);
@@ -63,7 +61,6 @@ final class ControllerDiagramView extends View {
     private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
 
     private Listener listener;
@@ -77,14 +74,14 @@ final class ControllerDiagramView extends View {
         setFocusable(true);
         setClickable(true);
 
-        spots.put(ControllerMapping.Action.L, new Spot(23.2f, 5.2f, 16));
-        spots.put(ControllerMapping.Action.R, new Spot(76.8f, 5.2f, 16));
-        spots.put(ControllerMapping.Action.SELECT, new Spot(41, 29.7f, 8));
-        spots.put(ControllerMapping.Action.START, new Spot(51.5f, 29.9f, 8));
-        spots.put(ControllerMapping.Action.X, new Spot(78.2f, 19.4f, 2 * FACE_R));
-        spots.put(ControllerMapping.Action.Y, new Spot(68.9f, 26.6f, 2 * FACE_R));
-        spots.put(ControllerMapping.Action.A, new Spot(87.7f, 26.4f, 2 * FACE_R));
-        spots.put(ControllerMapping.Action.B, new Spot(78.4f, 33.7f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.L, new Spot(21.8f, 5.2f, 20));
+        spots.put(ControllerMapping.Action.R, new Spot(78.2f, 5.2f, 20));
+        spots.put(ControllerMapping.Action.SELECT, new Spot(40.5f, 30.2f, 8));
+        spots.put(ControllerMapping.Action.START, new Spot(51.6f, 30.2f, 8));
+        spots.put(ControllerMapping.Action.X, new Spot(78.5f, 19f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.Y, new Spot(69f, 26.5f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.A, new Spot(88.2f, 26.4f, 2 * FACE_R));
+        spots.put(ControllerMapping.Action.B, new Spot(78.7f, 33.9f, 2 * FACE_R));
     }
 
     void setListener(Listener listener) {
@@ -119,46 +116,9 @@ final class ControllerDiagramView extends View {
             rect.set(0, PICTURE_TOP * u, 100 * u, PICTURE_TOP * u + height);
             canvas.drawBitmap(picture, null, rect, bitmapPaint);
         }
-        drawPrintedLabels(canvas, u);
         for (ControllerMapping.Action action : ORDER) {
             drawRing(canvas, action, spots.get(action), u);
         }
-    }
-
-    /** The names printed on the controller, as on the real one. */
-    private void drawPrintedLabels(Canvas canvas, float u) {
-        text.setTextAlign(Paint.Align.CENTER);
-
-        // SELECT and START under their buttons, over the little marks the
-        // picture has there.
-        text.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC));
-        text.setTextSize(2.7f * u);
-        text.setLetterSpacing(0.08f);
-        for (ControllerMapping.Action action : new ControllerMapping.Action[] {
-                ControllerMapping.Action.SELECT, ControllerMapping.Action.START}) {
-            Spot spot = spots.get(action);
-            float y = 35.4f * u;
-            rect.set((spot.x - 4) * u, 33 * u, (spot.x + 4) * u, 36.6f * u);
-            fill.setColor(BODY);
-            canvas.drawRect(rect, fill);
-            text.setColor(0xFF66676C);
-            canvas.drawText(action.button.toUpperCase(java.util.Locale.ROOT), spot.x * u, y, text);
-        }
-
-        // The letters beside the face buttons.
-        text.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
-        text.setTextSize(3.2f * u);
-        text.setLetterSpacing(0);
-        text.setColor(0xFFCDCED2);
-        drawLetter(canvas, ControllerMapping.Action.X, 6.5f, -5f, u);
-        drawLetter(canvas, ControllerMapping.Action.A, 5.4f, -4.3f, u);
-        drawLetter(canvas, ControllerMapping.Action.Y, -5.6f, 4.5f, u);
-        drawLetter(canvas, ControllerMapping.Action.B, -6.3f, 5f, u);
-    }
-
-    private void drawLetter(Canvas canvas, ControllerMapping.Action action, float dx, float dy, float u) {
-        Spot spot = spots.get(action);
-        canvas.drawText(action.button, (spot.x + dx) * u, (spot.y + dy + 1.15f) * u, text);
     }
 
     /**
