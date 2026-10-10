@@ -8,6 +8,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.TypedValue;
 import android.widget.TextView;
 
@@ -55,6 +58,27 @@ final class Ui {
         } else {
             view.requestFocus();
         }
+    }
+
+    /**
+     * A short buzz so the player feels a tap landed; {@code confirm} gives a double one, for when
+     * something was saved. Works even with the system's touch vibration turned off.
+     */
+    static void vibrate(Context context, boolean confirm) {
+        Vibrator vibrator = context.getSystemService(Vibrator.class);
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return;
+        }
+        VibrationEffect effect;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            effect = VibrationEffect.createPredefined(confirm
+                    ? VibrationEffect.EFFECT_DOUBLE_CLICK : VibrationEffect.EFFECT_CLICK);
+        } else if (confirm) {
+            effect = VibrationEffect.createWaveform(new long[] {0, 25, 80, 25}, -1);
+        } else {
+            effect = VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE);
+        }
+        vibrator.vibrate(effect);
     }
 
     static int dp(Context context, float value) {

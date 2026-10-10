@@ -62,11 +62,14 @@ final class ControlsDialog extends Dialog {
         info.setFocusable(true);
         info.setClickable(true);
         info.setContentDescription(context.getString(R.string.controls_info_title));
-        info.setOnClickListener(v -> new ActionSheet(context)
-                .title(context.getString(R.string.controls_info_title))
-                .subtitle(context.getString(R.string.controls_paddles))
-                .action(Ui.GREEN, R.drawable.ic_play, context.getString(R.string.controls_ok), null)
-                .show());
+        info.setOnClickListener(v -> {
+            Ui.vibrate(context, false);
+            new ActionSheet(context)
+                    .title(context.getString(R.string.controls_info_title))
+                    .subtitle(context.getString(R.string.controls_paddles))
+                    .action(Ui.GREEN, R.drawable.ic_play, context.getString(R.string.controls_ok), null)
+                    .show();
+        });
         header.addView(info, new LinearLayout.LayoutParams(Ui.dp(context, 34), Ui.dp(context, 34)));
         panel.addView(header);
 
@@ -86,6 +89,7 @@ final class ControlsDialog extends Dialog {
 
             @Override
             public void onDpadPicked() {
+                Ui.vibrate(context, false);
                 stopListening();
                 hint.setText(R.string.controls_dpad);
             }
@@ -215,6 +219,7 @@ final class ControlsDialog extends Dialog {
 
     private void startListening(ControllerMapping.Action action, TextView label) {
         stopListening();
+        Ui.vibrate(getContext(), false);
         listening = action;
         listeningLabel = label;
         if (label != null) {
@@ -235,6 +240,7 @@ final class ControlsDialog extends Dialog {
         ControllerMapping.Action action = listening;
         stopListening();
         mapping.assign(keyCode, action);
+        Ui.vibrate(getContext(), true);
         refresh();
     }
 
@@ -341,7 +347,10 @@ final class ControlsDialog extends Dialog {
         button.setBackground(Ui.selectable(context, Ui.rounded(0x00000000, radius), radius));
         button.setFocusable(true);
         button.setClickable(true);
-        button.setOnClickListener(click);
+        button.setOnClickListener(v -> {
+            Ui.vibrate(context, false);
+            click.onClick(v);
+        });
         return button;
     }
 }
