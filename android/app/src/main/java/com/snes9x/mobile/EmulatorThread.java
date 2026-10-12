@@ -70,9 +70,13 @@ final class EmulatorThread extends Thread {
         paint.setFilterBitmap(false);
     }
 
+    /** A new surface needs to be told the game's frame rate. */
+    private boolean frameRatePending;
+
     void setSurface(SurfaceHolder holder) {
         synchronized (lock) {
             this.holder = holder;
+            frameRatePending = true;
             lock.notifyAll();
         }
     }
@@ -129,13 +133,15 @@ final class EmulatorThread extends Thread {
     public void run() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
         aspectRatio = NativeBridge.getAspectRatio();
-        long frameNanos = (long) (1_000_000_000L / NativeBridge.getFps());
+        double fps = NativeBridge.getFps();
+        long frameNanos = (long) (1_000_000_000L / fps);
         createAudioTrack(NativeBridge.getSampleRate());
         FrameHints hints = FrameHints.create(context, frameNanos);
 
         long nextFrame = System.nanoTime();
         while (true) {
             SurfaceHolder surface;
+            boolean setFrameRate;
             synchronized (lock) {
                 while (!stopped && (paused || holder == null)) {
                     if (track != null) {
@@ -152,6 +158,20 @@ final class EmulatorThread extends Thread {
                     break;
                 }
                 surface = holder;
+                setFrameRate = frameRatePending;
+                frameRatePending = false;
+            }
+            // Phones with adaptive refresh rates drop the screen to 30 Hz or
+            // less when nobody touches it, and drawing waits for the screen,
+            // so the game would run at half speed until the next touch.
+            // Saying the picture changes at the game's rate keeps it up.
+            Surface current = surface.getSurface();
+            if (setFrameRate && Build.VERSION.SDK_INT >= 30 && current != null && current.isValid()) {
+                try {
+                    current.setFrameRate((float) fps, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+                } catch (RuntimeException e) {
+                    // Not supported here; nothing to do.
+                }
             }
             long workStart = System.nanoTime();
 

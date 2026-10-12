@@ -13,6 +13,7 @@ import android.os.PowerManager;
 import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.InputDevice;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
@@ -73,10 +74,37 @@ public class GameActivity extends Activity
     private boolean controllerConnected;
     private int openMenus;
 
+    /**
+     * Pins the screen to the mode closest to 60 Hz (at the current resolution), so phones with
+     * adaptive refresh rates don't drop to 30 Hz or less while nobody touches the screen, which
+     * would slow the game down. The surface also asks for the game's rate (EmulatorThread).
+     */
+    private void keepRefreshRate() {
+        Display display = getWindowManager().getDefaultDisplay();
+        Display.Mode current = display.getMode();
+        Display.Mode best = null;
+        for (Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() != current.getPhysicalWidth()
+                    || mode.getPhysicalHeight() != current.getPhysicalHeight()
+                    || mode.getRefreshRate() < 59) {
+                continue;
+            }
+            if (best == null || mode.getRefreshRate() < best.getRefreshRate()) {
+                best = mode;
+            }
+        }
+        if (best != null) {
+            WindowManager.LayoutParams params = getWindow().getAttributes();
+            params.preferredDisplayModeId = best.getModeId();
+            getWindow().setAttributes(params);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        keepRefreshRate();
         // Before Android 12 there are no per-frame hints (see FrameHints);
         // ask for a steady CPU speed instead where the phone supports it.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
