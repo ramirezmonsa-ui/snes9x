@@ -9,6 +9,7 @@ import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.InputDevice;
@@ -76,6 +77,14 @@ public class GameActivity extends Activity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // Before Android 12 there are no per-frame hints (see FrameHints);
+        // ask for a steady CPU speed instead where the phone supports it.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            PowerManager power = getSystemService(PowerManager.class);
+            if (power != null && power.isSustainedPerformanceModeSupported()) {
+                getWindow().setSustainedPerformanceMode(true);
+            }
+        }
 
         FrameLayout root = new FrameLayout(this);
         SurfaceView surface = new SurfaceView(this);
@@ -166,7 +175,7 @@ public class GameActivity extends Activity
         View content = findViewById(android.R.id.content);
         placeTopButtons(content.getWidth(), content.getHeight());
 
-        emulator = new EmulatorThread();
+        emulator = new EmulatorThread(this);
         emulator.setAlignTop(isPortrait());
         emulator.setFilter(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP));
         emulator.start();

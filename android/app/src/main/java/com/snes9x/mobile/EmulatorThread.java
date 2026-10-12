@@ -1,5 +1,6 @@
 package com.snes9x.mobile;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -60,8 +61,11 @@ final class EmulatorThread extends Thread {
     private int scanlineRows;
     private final Paint scanlinePaint = new Paint();
 
-    EmulatorThread() {
+    private final Context context;
+
+    EmulatorThread(Context context) {
         super("Snes9x");
+        this.context = context.getApplicationContext();
         // Nearest-neighbour scaling keeps the pixels sharp.
         paint.setFilterBitmap(false);
     }
@@ -127,6 +131,7 @@ final class EmulatorThread extends Thread {
         aspectRatio = NativeBridge.getAspectRatio();
         long frameNanos = (long) (1_000_000_000L / NativeBridge.getFps());
         createAudioTrack(NativeBridge.getSampleRate());
+        FrameHints hints = FrameHints.create(context, frameNanos);
 
         long nextFrame = System.nanoTime();
         while (true) {
@@ -148,6 +153,7 @@ final class EmulatorThread extends Thread {
                 }
                 surface = holder;
             }
+            long workStart = System.nanoTime();
 
             if (rewinding) {
                 // No sound while rewinding; two snapshots a frame (each is
@@ -161,6 +167,9 @@ final class EmulatorThread extends Thread {
                 }
                 if (size[0] > 0 && size[1] > 0) {
                     draw(surface, size[0], size[1]);
+                }
+                if (hints != null) {
+                    hints.reportWork(System.nanoTime() - workStart);
                 }
                 nextFrame += frameNanos;
                 long wait = (nextFrame - System.nanoTime()) / 1_000_000L;
@@ -189,6 +198,9 @@ final class EmulatorThread extends Thread {
             if (size[0] > 0 && size[1] > 0) {
                 draw(surface, size[0], size[1]);
             }
+            if (hints != null) {
+                hints.reportWork(System.nanoTime() - workStart);
+            }
 
             if (track != null) {
                 if (track.getPlayState() != AudioTrack.PLAYSTATE_PLAYING) {
@@ -210,6 +222,9 @@ final class EmulatorThread extends Thread {
         if (track != null) {
             track.release();
             track = null;
+        }
+        if (hints != null) {
+            hints.close();
         }
     }
 
