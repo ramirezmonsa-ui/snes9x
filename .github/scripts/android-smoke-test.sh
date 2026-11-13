@@ -148,6 +148,16 @@ alive "abrir las partidas guardadas"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
+# Volume, from the pause menu.
+adb shell input keyevent KEYCODE_BACK
+sleep 2
+tap_text "Volumen: 100%"
+sleep 2
+shot volume
+alive "abrir el volumen"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+
 # Controller setup, from the pause menu.
 adb shell input keyevent KEYCODE_BACK
 sleep 2

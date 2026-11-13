@@ -52,6 +52,7 @@ final class EmulatorThread extends Thread {
     private boolean alignTop;
 
     private volatile boolean fastForward;
+    private volatile float volume = 1f;
     private volatile boolean rewinding;
     private volatile int filter = FILTER_SHARP;
 
@@ -92,6 +93,11 @@ final class EmulatorThread extends Thread {
 
     boolean isFastForward() {
         return fastForward;
+    }
+
+    /** The game's sound volume, from 0 (silent) to 1 (full). */
+    void setVolume(float volume) {
+        this.volume = Math.max(0f, Math.min(1f, volume));
     }
 
     /** While true the game runs backwards. */
@@ -138,6 +144,7 @@ final class EmulatorThread extends Thread {
         createAudioTrack(NativeBridge.getSampleRate());
         FrameHints hints = FrameHints.create(context, frameNanos);
 
+        float appliedVolume = 1f;
         long nextFrame = System.nanoTime();
         while (true) {
             SurfaceHolder surface;
@@ -223,6 +230,10 @@ final class EmulatorThread extends Thread {
             }
 
             if (track != null) {
+                if (volume != appliedVolume) {
+                    appliedVolume = volume;
+                    track.setVolume(appliedVolume);
+                }
                 if (track.getPlayState() != AudioTrack.PLAYSTATE_PLAYING) {
                     track.play();
                 }

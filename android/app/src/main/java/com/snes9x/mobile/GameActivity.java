@@ -140,7 +140,21 @@ public class GameActivity extends Activity
         pauseButton = topButton(R.drawable.ic_pause, R.string.menu_paused);
         pauseButton.setOnClickListener(v -> showMenu());
         fastForwardButton = topButton(R.drawable.ic_fast_forward, R.string.fast_forward);
-        fastForwardButton.setOnClickListener(v -> toggleFastForward());
+        // A tap toggles it; in "hold" mode it runs only while pressed.
+        fastForwardButton.setOnTouchListener((v, event) -> {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                if (fastForwardHold()) {
+                    setFastForward(true);
+                } else {
+                    toggleFastForward();
+                }
+            } else if ((action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                    && fastForwardHold()) {
+                setFastForward(false);
+            }
+            return true;
+        });
         int size = Ui.dp(this, 44);
         for (ImageView button : new ImageView[] {rewindButton, pauseButton, fastForwardButton}) {
             root.addView(button, new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.START));
@@ -206,6 +220,7 @@ public class GameActivity extends Activity
         emulator = new EmulatorThread(this);
         emulator.setAlignTop(isPortrait());
         emulator.setFilter(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP));
+        emulator.setVolume(gain(prefs.getInt(KEY_VOLUME, 100)));
         emulator.start();
 
         if (slots.exists(SaveSlots.AUTO)) {
@@ -278,11 +293,22 @@ public class GameActivity extends Activity
     // --- Fast-forward and rewind --------------------------------------------
 
     private void toggleFastForward() {
-        if (emulator == null) {
+        if (emulator != null) {
+            setFastForward(!emulator.isFastForward());
+        }
+    }
+
+    private void setFastForward(boolean on) {
+        if (emulator == null || emulator.isFastForward() == on) {
             return;
         }
-        emulator.setFastForward(!emulator.isFastForward());
+        emulator.setFastForward(on);
         updateSpeedIndicators();
+    }
+
+    /** Set in Configurar control: fast-forward only while its button is held. */
+    private boolean fastForwardHold() {
+        return mapping != null && mapping.fastForwardHold();
     }
 
     private void setRewinding(boolean rewinding) {
@@ -433,6 +459,8 @@ public class GameActivity extends Activity
                 .action(Ui.YELLOW, R.drawable.ic_tv, getString(R.string.menu_screen,
                         filterName(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP))),
                         null, this::chooseFilter)
+                .action(Ui.GREEN, R.drawable.ic_volume, getString(R.string.menu_volume,
+                        prefs.getInt(KEY_VOLUME, 100)), this::chooseVolume)
                 .action(Ui.SHELL, R.drawable.ic_gamepad, getString(touchVisible
                         ? R.string.menu_hide_controls : R.string.menu_show_controls),
                         () -> setTouchControlsVisible(!touchVisible))
@@ -467,8 +495,33 @@ public class GameActivity extends Activity
     private void showControls() {
         pauseForMenu();
         ControlsDialog dialog = new ControlsDialog(this, mapping);
-        dialog.setOnDismissListener(d -> onMenuClosed());
+        dialog.setOnDismissListener(d -> {
+            // The fast-forward mode may have changed: start at normal speed.
+            setFastForward(false);
+            onMenuClosed();
+        });
         dialog.show();
+    }
+
+    // --- Volume ---------------------------------------------------------------
+
+    /** 0-100; the same for every game. */
+    private static final String KEY_VOLUME = "volume";
+
+    /** Sliders feel even when the gain grows with the square of the setting. */
+    private static float gain(int percent) {
+        float linear = percent / 100f;
+        return linear * linear;
+    }
+
+    private void chooseVolume() {
+        pauseForMenu();
+        VolumeDialog.show(this, prefs.getInt(KEY_VOLUME, 100), percent -> {
+            prefs.edit().putInt(KEY_VOLUME, percent).apply();
+            if (emulator != null) {
+                emulator.setVolume(gain(percent));
+            }
+        }, this::onMenuClosed);
     }
 
     // --- Screen filter ------------------------------------------------------
@@ -692,7 +745,9 @@ public class GameActivity extends Activity
     private void runAction(ControllerMapping.Action action, boolean down) {
         switch (action) {
             case FAST_FORWARD:
-                if (down) {
+                if (fastForwardHold()) {
+                    setFastForward(down);
+                } else if (down) {
                     toggleFastForward();
                 }
                 break;

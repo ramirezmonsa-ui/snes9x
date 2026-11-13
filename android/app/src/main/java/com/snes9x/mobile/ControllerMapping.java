@@ -41,6 +41,7 @@ final class ControllerMapping {
 
     private static final String PREFS = "controls";
     private static final String KEY = "map";
+    private static final String KEY_FAST_FORWARD_HOLD = "fast_forward_hold";
 
     private final Context context;
     private final Map<Integer, Action> map = new LinkedHashMap<>();
@@ -82,6 +83,18 @@ final class ControllerMapping {
         map.clear();
         putDefaults(map);
         save();
+        setFastForwardHold(false);
+    }
+
+    /** Whether fast-forward runs only while its button is held, instead of a tap toggling it. */
+    boolean fastForwardHold() {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_FAST_FORWARD_HOLD, false);
+    }
+
+    void setFastForwardHold(boolean hold) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean(KEY_FAST_FORWARD_HOLD, hold).apply();
     }
 
     /** The d-pad always moves; those keys can't be reassigned. */

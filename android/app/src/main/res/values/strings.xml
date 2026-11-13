@@ -81,6 +81,18 @@
     <string name="continue_no_detail">Tus guardados no se pierden</string>
 
     <!-- Screen filter -->
+    <string name="menu_volume">Volumen: %1$d%%</string>
+    <string name="volume_title">Volumen</string>
+    <string name="volume_subtitle">El volumen de los juegos, aparte del volumen del celular.</string>
+    <string name="volume_mute">Sin sonido</string>
+    <string name="volume_done">Listo</string>
+    <string name="ff_mode_row">Modo del avance rápido</string>
+    <string name="ff_mode_title">Avance rápido</string>
+    <string name="ff_mode_subtitle">¿Cómo quieres usar el botón de avance rápido?</string>
+    <string name="ff_mode_toggle">Un toque</string>
+    <string name="ff_mode_toggle_detail">Presiona una vez para acelerar y otra vez para volver a la velocidad normal.</string>
+    <string name="ff_mode_hold">Mantener apretado</string>
+    <string name="ff_mode_hold_detail">Acelera solo mientras mantienes el botón apretado.</string>
     <string name="filter_title">Pantalla</string>
     <string name="filter_subtitle">Se recuerda para este juego</string>
     <string name="filter_sharp">Original</string>

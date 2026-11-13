@@ -154,6 +154,7 @@ final class ControlsDialog extends Dialog {
         for (ControllerMapping.Action action : EXTRAS) {
             list.addView(row(context, action));
         }
+        list.addView(fastForwardModeRow(context));
     }
 
     private View row(Context context, ControllerMapping.Action action) {
@@ -181,6 +182,55 @@ final class ControlsDialog extends Dialog {
         params.topMargin = Ui.dp(context, 2);
         row.setLayoutParams(params);
         return row;
+    }
+
+    /** Whether a tap toggles fast-forward or it runs only while held. */
+    private View fastForwardModeRow(Context context) {
+        float radius = Ui.dp(context, 14);
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(Ui.dp(context, 52));
+        row.setPadding(Ui.dp(context, 10), Ui.dp(context, 6), Ui.dp(context, 12), Ui.dp(context, 6));
+        row.setBackground(Ui.selectable(context, Ui.rounded(0x00000000, radius), radius));
+        row.setFocusable(true);
+        row.setClickable(true);
+
+        int size = Ui.dp(context, 38);
+        row.addView(Ui.faceButton(context, R.drawable.ic_fast_forward, Ui.SHELL, size),
+                new LinearLayout.LayoutParams(size, size));
+        LinearLayout labels = new LinearLayout(context);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(Ui.dp(context, 14), 0, 0, 0);
+        labels.addView(Ui.label(context, context.getString(R.string.ff_mode_row), 16, Ui.TEXT));
+        labels.addView(Ui.text(context, context.getString(mapping.fastForwardHold()
+                ? R.string.ff_mode_hold : R.string.ff_mode_toggle), 13, Ui.TEXT_DIM, false));
+        row.addView(labels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+
+        row.setOnClickListener(v -> {
+            Ui.vibrate(context, false);
+            new ActionSheet(context)
+                    .title(context.getString(R.string.ff_mode_title))
+                    .subtitle(context.getString(R.string.ff_mode_subtitle))
+                    .action(Ui.RED, R.drawable.ic_fast_forward,
+                            context.getString(R.string.ff_mode_toggle),
+                            context.getString(R.string.ff_mode_toggle_detail),
+                            () -> setFastForwardHold(false))
+                    .action(Ui.BLUE, R.drawable.ic_fast_forward,
+                            context.getString(R.string.ff_mode_hold),
+                            context.getString(R.string.ff_mode_hold_detail),
+                            () -> setFastForwardHold(true))
+                    .show();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = Ui.dp(context, 2);
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private void setFastForwardHold(boolean hold) {
+        mapping.setFastForwardHold(hold);
+        refresh();
     }
 
     private String keysText(Context context, ControllerMapping.Action action) {
