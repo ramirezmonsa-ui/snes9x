@@ -17,9 +17,11 @@ Color** (con [mGBA](https://mgba.io), en `third_party/mgba`).
 - **Partidas guardadas**: 5 espacios por juego, cada uno con una foto del
   momento, y un guardado automático al salir ("¿Continuar donde lo dejaste?").
 - **Avance rápido** (x3): botón ⏩ arriba o gatillo **R2**; un toque lo prende
-  y otro lo apaga.
+  y otro lo apaga, o en **Configurar control** se puede cambiar a "mantener
+  apretado".
 - **Rebobinar** hasta ~20 segundos: mantener apretado ⏪ arriba o el gatillo
   **L2**.
+- **Volumen** de los juegos (menú de pausa), aparte del volumen del celular.
 - **Pantalla**: Original, Suave o Tele vieja (con líneas de tele de tubo),
   recordada para cada juego.
 - Funciona en vertical y horizontal.
