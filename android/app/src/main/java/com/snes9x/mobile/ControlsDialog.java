@@ -253,7 +253,8 @@ final class ControlsDialog extends Dialog {
     private void capture(ControllerMapping.Action action) {
         Context context = getContext();
         Ui.vibrate(context, false);
-        new KeyCaptureDialog(context, action, chip(context, action, 64), actionName(context, action),
+        new KeyCaptureDialog(context, mapping, action, chip(context, action, 64),
+                actionName(context, action),
                 keysText(context, action), (picked, keyCode) -> {
                     mapping.assign(keyCode, picked);
                     hint.setText(R.string.controls_hint);

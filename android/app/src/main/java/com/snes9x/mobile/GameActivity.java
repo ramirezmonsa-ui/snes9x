@@ -334,6 +334,9 @@ public class GameActivity extends Activity
         } else if (moveView) {
             speedBadge.setText(getString(R.string.badge_move_view));
             speedBadge.setVisibility(View.VISIBLE);
+        } else if (emulator != null && System.currentTimeMillis() < zoomBadgeUntil) {
+            speedBadge.setText(getString(R.string.badge_zoom, emulator.getZoom()));
+            speedBadge.setVisibility(View.VISIBLE);
         } else {
             speedBadge.setVisibility(View.GONE);
         }
@@ -828,12 +831,9 @@ public class GameActivity extends Activity
         // The right stick zooms (up to get closer, down to go back) or, after
         // clicking it (R3), moves the zoomed view. Most controllers report it
         // as Z/RZ, some as RX/RY.
-        float rightX = event.getAxisValue(MotionEvent.AXIS_Z);
-        float rightY = event.getAxisValue(MotionEvent.AXIS_RZ);
-        if (Math.abs(rightX) < ZOOM_DEAD_ZONE && Math.abs(rightY) < ZOOM_DEAD_ZONE) {
-            rightX = event.getAxisValue(MotionEvent.AXIS_RX);
-            rightY = event.getAxisValue(MotionEvent.AXIS_RY);
-        }
+        boolean rxRy = rightStickIsRxRy(event.getDevice());
+        float rightX = event.getAxisValue(rxRy ? MotionEvent.AXIS_RX : MotionEvent.AXIS_Z);
+        float rightY = event.getAxisValue(rxRy ? MotionEvent.AXIS_RY : MotionEvent.AXIS_RZ);
         rightX = Math.abs(rightX) < ZOOM_DEAD_ZONE ? 0 : rightX;
         rightY = Math.abs(rightY) < ZOOM_DEAD_ZONE ? 0 : rightY;
         if (emulator != null) {
@@ -843,6 +843,9 @@ public class GameActivity extends Activity
             } else {
                 emulator.setPanSpeed(0, 0);
                 emulator.setZoomSpeed(-rightY);
+                if (rightY != 0) {
+                    showZoomBadge();
+                }
             }
         }
 
@@ -866,6 +869,44 @@ public class GameActivity extends Activity
     }
 
     private static final float ZOOM_DEAD_ZONE = 0.3f;
+
+    /**
+     * Android's standard gamepad layout puts the right stick on Z/RZ and the triggers on their
+     * own axes. Controllers in other modes put the right stick on RX/RY and the triggers on
+     * Z/RZ, where a trigger at rest would read as the stick held up or down.
+     */
+    private static boolean rightStickIsRxRy(InputDevice device) {
+        if (device == null) {
+            return false;
+        }
+        boolean triggersApart = device.getMotionRange(MotionEvent.AXIS_LTRIGGER) != null
+                || device.getMotionRange(MotionEvent.AXIS_BRAKE) != null;
+        boolean hasRxRy = device.getMotionRange(MotionEvent.AXIS_RX) != null
+                && device.getMotionRange(MotionEvent.AXIS_RY) != null;
+        boolean hasZRz = device.getMotionRange(MotionEvent.AXIS_Z) != null
+                && device.getMotionRange(MotionEvent.AXIS_RZ) != null;
+        return hasRxRy && (!triggersApart || !hasZRz);
+    }
+
+    /** Shows "🔍 x1.8" while the zoom changes, and a moment after. */
+    private long zoomBadgeUntil;
+    private final Runnable zoomBadgeTick = new Runnable() {
+        @Override
+        public void run() {
+            updateSpeedIndicators();
+            if (System.currentTimeMillis() < zoomBadgeUntil) {
+                speedBadge.postDelayed(this, 100);
+            }
+        }
+    };
+
+    private void showZoomBadge() {
+        boolean running = System.currentTimeMillis() < zoomBadgeUntil;
+        zoomBadgeUntil = System.currentTimeMillis() + 1200;
+        if (!running) {
+            speedBadge.post(zoomBadgeTick);
+        }
+    }
 
     /** After clicking the right stick while zoomed in, it moves the view instead of zooming. */
     private boolean moveView;

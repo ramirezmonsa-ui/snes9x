@@ -68,16 +68,37 @@ final class ControllerMapping {
     }
 
     /**
-     * Makes {@code keyCode} do {@code action}, taking it away from whatever it did before. The
-     * new button replaces the controller buttons the action had, so only one works for it;
-     * keyboard keys stay.
+     * Makes {@code keyCode} do {@code action}, so each action has one controller button and
+     * each button one action. If the button did something else, the two swap: that other action
+     * gets the button {@code action} had, so nothing is left without a button. Keyboard keys
+     * stay as they are.
      */
     void assign(int keyCode, Action action) {
+        Action previous = map.get(keyCode);
+        Integer oldKey = gamepadKey(action);
         map.entrySet().removeIf(entry -> entry.getValue() == action
                 && KeyEvent.isGamepadButton(entry.getKey()));
         map.remove(keyCode);
         map.put(keyCode, action);
+        if (previous != null && previous != action && oldKey != null && oldKey != keyCode) {
+            map.put(oldKey, previous);
+        }
         save();
+    }
+
+    /** What pressing {@code keyCode} does now, if anything. */
+    Action actionFor(int keyCode) {
+        return map.get(keyCode);
+    }
+
+    /** The controller button for an action, or null if it has none. */
+    Integer gamepadKey(Action action) {
+        for (Map.Entry<Integer, Action> entry : map.entrySet()) {
+            if (entry.getValue() == action && KeyEvent.isGamepadButton(entry.getKey())) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     void clear(Action action) {
@@ -123,10 +144,8 @@ final class ControllerMapping {
         map.put(KeyEvent.KEYCODE_BUTTON_SELECT, Action.SELECT);
         map.put(KeyEvent.KEYCODE_BUTTON_R2, Action.FAST_FORWARD);
         map.put(KeyEvent.KEYCODE_BUTTON_L2, Action.REWIND);
-        // Stick clicks are unused by these consoles. Back paddles (like M1
-        // and M2 on EasySMX pads) can be set on the controller to copy them.
-        map.put(KeyEvent.KEYCODE_BUTTON_THUMBR, Action.FAST_FORWARD);
-        map.put(KeyEvent.KEYCODE_BUTTON_THUMBL, Action.REWIND);
+        // One button per action: the stick clicks are free (clicking the
+        // right stick moves the zoomed view).
         map.put(KeyEvent.KEYCODE_BUTTON_MODE, Action.MENU);
         // Keyboard, handy on Chromebooks and with the emulator.
         map.put(KeyEvent.KEYCODE_X, Action.A);
@@ -159,6 +178,43 @@ final class ControllerMapping {
             } catch (IllegalArgumentException e) {
                 // Skip entries from an older or newer version.
             }
+        }
+        keepOneButtonPerAction();
+    }
+
+    /**
+     * Older versions gave an action several controller buttons (the stick clicks as well as
+     * the triggers, or a new button added next to the old one). Keeps one: a stick click only
+     * if it is the action's only button, otherwise the most recently assigned.
+     */
+    private void keepOneButtonPerAction() {
+        boolean changed = false;
+        for (Action action : Action.values()) {
+            List<Integer> buttons = new ArrayList<>();
+            for (Map.Entry<Integer, Action> entry : map.entrySet()) {
+                if (entry.getValue() == action && KeyEvent.isGamepadButton(entry.getKey())) {
+                    buttons.add(entry.getKey());
+                }
+            }
+            if (buttons.size() < 2) {
+                continue;
+            }
+            List<Integer> candidates = new ArrayList<>(buttons);
+            candidates.removeIf(key -> key == KeyEvent.KEYCODE_BUTTON_THUMBL
+                    || key == KeyEvent.KEYCODE_BUTTON_THUMBR);
+            if (candidates.isEmpty()) {
+                candidates = buttons;
+            }
+            Integer keep = candidates.get(candidates.size() - 1);
+            for (Integer key : buttons) {
+                if (!key.equals(keep)) {
+                    map.remove(key);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            save();
         }
     }
 

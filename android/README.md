@@ -69,7 +69,7 @@ De fábrica, los botones funcionan por posición, igual que en el control de SNE
 | LB | L |
 | RB | R |
 | LT (L2) o L3 | Rebobinar (mantener) |
-| RT (R2) o R3 | Avance rápido (prender/apagar) |
+| RT (R2) | Avance rápido (prender/apagar) |
 | Cruceta o palanca izquierda | Cruceta |
 | Start / Menú | Start |
 | Select / View | Select |

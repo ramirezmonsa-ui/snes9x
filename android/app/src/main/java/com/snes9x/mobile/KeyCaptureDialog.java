@@ -30,6 +30,8 @@ final class KeyCaptureDialog extends Dialog {
 
     private final ControllerMapping.Action action;
     private final Listener listener;
+    private final ControllerMapping mapping;
+    private final TextView message;
     private final TextView box;
     private final TextView ok;
     private final TextView cancel;
@@ -40,11 +42,12 @@ final class KeyCaptureDialog extends Dialog {
      * @param chip the SNES button (or the extra function's icon) shown on the left
      * @param current what presses this action now
      */
-    KeyCaptureDialog(Context context, ControllerMapping.Action action, View chip, String title,
-            String current, Listener listener) {
+    KeyCaptureDialog(Context context, ControllerMapping mapping, ControllerMapping.Action action,
+            View chip, String title, String current, Listener listener) {
         super(context);
         this.action = action;
         this.listener = listener;
+        this.mapping = mapping;
         requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         int pad = Ui.dp(context, 22);
@@ -79,7 +82,7 @@ final class KeyCaptureDialog extends Dialog {
         pair.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, size));
         panel.addView(pair);
 
-        TextView message = Ui.text(context, context.getString(R.string.controls_capture_prompt), 15,
+        message = Ui.text(context, context.getString(R.string.controls_capture_prompt), 15,
                 Ui.TEXT, false);
         message.setGravity(Gravity.CENTER);
         panel.addView(message);
@@ -160,6 +163,7 @@ final class KeyCaptureDialog extends Dialog {
 
     /** Shows the pressed button in the box; it replaces the one shown before. */
     private void pressed(int code) {
+        showSwap(code);
         keyCode = code;
         pulse.cancel();
         box.setAlpha(1f);
@@ -167,6 +171,26 @@ final class KeyCaptureDialog extends Dialog {
         box.setBackground(Ui.rounded(Ui.DARK, Ui.dp(getContext(), 18)));
         setOkEnabled(true);
         Ui.vibrate(getContext(), false);
+    }
+
+    /** If the button already does something else, says that the two will swap. */
+    private void showSwap(int code) {
+        Context context = getContext();
+        ControllerMapping.Action owner = mapping.actionFor(code);
+        if (owner == null || owner == action) {
+            message.setText(R.string.controls_capture_prompt);
+            message.setTextColor(Ui.TEXT);
+            return;
+        }
+        Integer mine = mapping.gamepadKey(action);
+        String ownerName = ControlsDialog.actionName(context, owner);
+        message.setText(mine != null && mine != code
+                ? context.getString(R.string.controls_capture_swap,
+                        ControllerMapping.keyName(context, code), ownerName,
+                        ControllerMapping.keyName(context, mine))
+                : context.getString(R.string.controls_capture_taken,
+                        ControllerMapping.keyName(context, code), ownerName));
+        message.setTextColor(Ui.RED);
     }
 
     private void save() {
