@@ -39,6 +39,7 @@
     <string name="fast_forward">Avance rápido</string>
     <string name="rewind">Rebobinar (mantener apretado)</string>
     <string name="badge_fast_forward">⏩ x3</string>
+    <string name="badge_move_view">🔍 Moviendo la vista · R3 para volver</string>
     <string name="badge_rewind">⏪ Rebobinando</string>
 
     <!-- Controller buttons -->

@@ -59,6 +59,13 @@ final class EmulatorThread extends Thread {
     private static final float ZOOM_PER_SECOND = 1.5f;
     private volatile float zoom = 1f;
     private volatile float zoomSpeed;
+    // Where the zoomed view is, from -1 (left/top edge) to 1 (right/bottom),
+    // 0 being the middle, and how fast the right stick moves it.
+    private static final float PAN_PER_SECOND = 1.2f;
+    private volatile float panX;
+    private volatile float panY;
+    private volatile float panSpeedX;
+    private volatile float panSpeedY;
     private volatile boolean rewinding;
     private volatile int filter = FILTER_SHARP;
 
@@ -112,6 +119,18 @@ final class EmulatorThread extends Thread {
     /** -1..1: positive zooms in, negative zooms out, 0 stops. */
     void setZoomSpeed(float speed) {
         zoomSpeed = speed;
+    }
+
+    /** -1..1 on each axis; 0, 0 stops moving the view. */
+    void setPanSpeed(float x, float y) {
+        panSpeedX = x;
+        panSpeedY = y;
+    }
+
+    /** Back to the middle of the picture, where the player usually is. */
+    void centerView() {
+        panX = 0;
+        panY = 0;
     }
 
     /** The game's sound volume, from 0 (silent) to 1 (full). */
@@ -203,6 +222,14 @@ final class EmulatorThread extends Thread {
             float speed = zoomSpeed;
             if (speed != 0) {
                 setZoom(zoom * (float) Math.pow(1 + ZOOM_PER_SECOND, speed * frameNanos / 1e9));
+            }
+            float seconds = frameNanos / 1e9f;
+            if (panSpeedX != 0 || panSpeedY != 0) {
+                panX = Math.max(-1f, Math.min(1f, panX + panSpeedX * PAN_PER_SECOND * seconds));
+                panY = Math.max(-1f, Math.min(1f, panY + panSpeedY * PAN_PER_SECOND * seconds));
+            }
+            if (zoom <= 1f) {
+                centerView();
             }
 
             if (rewinding) {
@@ -366,8 +393,8 @@ final class EmulatorThread extends Thread {
             float shown = zoom;
             int sw = Math.max(1, Math.round(width / shown));
             int sh = Math.max(1, Math.round(height / shown));
-            int sx = (width - sw) / 2;
-            int sy = (height - sh) / 2;
+            int sx = Math.round((width - sw) / 2f * (1 + panX));
+            int sy = Math.round((height - sh) / 2f * (1 + panY));
             source.set(sx, sy, sx + sw, sy + sh);
             destination.set(left, top, left + w, top + h);
             int mode = filter;

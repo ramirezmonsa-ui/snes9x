@@ -331,6 +331,9 @@ public class GameActivity extends Activity
         } else if (fast) {
             speedBadge.setText(getString(R.string.badge_fast_forward));
             speedBadge.setVisibility(View.VISIBLE);
+        } else if (moveView) {
+            speedBadge.setText(getString(R.string.badge_move_view));
+            speedBadge.setVisibility(View.VISIBLE);
         } else {
             speedBadge.setVisibility(View.GONE);
         }
@@ -730,6 +733,23 @@ public class GameActivity extends Activity
             }
             return true;
         }
+        // Clicking the right stick while zoomed in switches it between
+        // zooming and moving the view; otherwise R3 does what it is set to.
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_THUMBR) {
+            boolean zoomed = emulator != null && emulator.getZoom() > 1.01f;
+            if (down && event.getRepeatCount() == 0 && (zoomed || moveView)) {
+                zoomClickHeld = true;
+                toggleMoveView();
+                return true;
+            }
+            if (!down && zoomClickHeld) {
+                zoomClickHeld = false;
+                return true;
+            }
+            if (zoomClickHeld) {
+                return true;
+            }
+        }
         ControllerMapping.Action mapped = mapping.get(keyCode);
         if (mapped == null) {
             return super.dispatchKeyEvent(event);
@@ -805,14 +825,25 @@ public class GameActivity extends Activity
         }
         axisButtons = buttons;
 
-        // The right stick zooms: up to get closer, down to go back. Most
-        // controllers report it as Z/RZ, some as RX/RY.
-        float zoomAxis = event.getAxisValue(MotionEvent.AXIS_RZ);
-        if (Math.abs(zoomAxis) < ZOOM_DEAD_ZONE) {
-            zoomAxis = event.getAxisValue(MotionEvent.AXIS_RY);
+        // The right stick zooms (up to get closer, down to go back) or, after
+        // clicking it (R3), moves the zoomed view. Most controllers report it
+        // as Z/RZ, some as RX/RY.
+        float rightX = event.getAxisValue(MotionEvent.AXIS_Z);
+        float rightY = event.getAxisValue(MotionEvent.AXIS_RZ);
+        if (Math.abs(rightX) < ZOOM_DEAD_ZONE && Math.abs(rightY) < ZOOM_DEAD_ZONE) {
+            rightX = event.getAxisValue(MotionEvent.AXIS_RX);
+            rightY = event.getAxisValue(MotionEvent.AXIS_RY);
         }
+        rightX = Math.abs(rightX) < ZOOM_DEAD_ZONE ? 0 : rightX;
+        rightY = Math.abs(rightY) < ZOOM_DEAD_ZONE ? 0 : rightY;
         if (emulator != null) {
-            emulator.setZoomSpeed(Math.abs(zoomAxis) < ZOOM_DEAD_ZONE ? 0 : -zoomAxis);
+            if (moveView) {
+                emulator.setZoomSpeed(0);
+                emulator.setPanSpeed(rightX, rightY);
+            } else {
+                emulator.setPanSpeed(0, 0);
+                emulator.setZoomSpeed(-rightY);
+            }
         }
 
         // Analog triggers act like the LT and RT keys, so they follow the
@@ -835,6 +866,25 @@ public class GameActivity extends Activity
     }
 
     private static final float ZOOM_DEAD_ZONE = 0.3f;
+
+    /** After clicking the right stick while zoomed in, it moves the view instead of zooming. */
+    private boolean moveView;
+    /** R3 went down as the zoom click, so its release is ours too. */
+    private boolean zoomClickHeld;
+
+    /** R3 while zoomed in: start moving the view, or go back to the player. */
+    private void toggleMoveView() {
+        moveView = !moveView;
+        if (emulator != null) {
+            emulator.setPanSpeed(0, 0);
+            emulator.setZoomSpeed(0);
+            if (!moveView) {
+                emulator.centerView();
+            }
+        }
+        Ui.vibrate(this, false);
+        updateSpeedIndicators();
+    }
 
     private String zoomKey() {
         return "zoom:" + gameName;

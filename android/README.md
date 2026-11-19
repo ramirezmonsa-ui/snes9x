@@ -22,7 +22,9 @@ Color** (con [mGBA](https://mgba.io), en `third_party/mgba`).
 - **Rebobinar** hasta ~20 segundos: mantener apretado ⏪ arriba o el gatillo
   **L2**.
 - **Zoom** con la palanca derecha del control: arriba acerca (hasta 3x, al
-  centro de la pantalla) y abajo aleja. Se recuerda para cada juego.
+  centro de la pantalla) y abajo aleja. Con zoom, apretar la palanca (R3)
+  pasa a mover la vista con ella; apretarla otra vez vuelve al personaje.
+  El zoom se recuerda para cada juego.
 - **Volumen** de los juegos (menú de pausa), aparte del volumen del celular.
 - **Pantalla**: Original, Suave o Tele vieja (con líneas de tele de tubo),
   recordada para cada juego.
