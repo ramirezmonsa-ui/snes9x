@@ -67,8 +67,14 @@ final class ControllerMapping {
         return keys;
     }
 
-    /** Makes {@code keyCode} do {@code action}, taking it away from whatever it did before. */
+    /**
+     * Makes {@code keyCode} do {@code action}, taking it away from whatever it did before. The
+     * new button replaces the controller buttons the action had, so only one works for it;
+     * keyboard keys stay.
+     */
     void assign(int keyCode, Action action) {
+        map.entrySet().removeIf(entry -> entry.getValue() == action
+                && KeyEvent.isGamepadButton(entry.getKey()));
         map.remove(keyCode);
         map.put(keyCode, action);
         save();

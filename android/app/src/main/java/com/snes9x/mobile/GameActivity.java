@@ -221,6 +221,7 @@ public class GameActivity extends Activity
         emulator.setAlignTop(isPortrait());
         emulator.setFilter(prefs.getInt(filterKey(), EmulatorThread.FILTER_SHARP));
         emulator.setVolume(gain(prefs.getInt(KEY_VOLUME, 100)));
+        emulator.setZoom(prefs.getFloat(zoomKey(), 1f));
         emulator.start();
 
         if (slots.exists(SaveSlots.AUTO)) {
@@ -366,6 +367,10 @@ public class GameActivity extends Activity
         super.onPause();
         if (emulator != null) {
             emulator.setPaused(true);
+            emulator.setZoomSpeed(0);
+            if (prefs != null) {
+                prefs.edit().putFloat(zoomKey(), emulator.getZoom()).apply();
+            }
         }
         storeSaveRam();
         storeAutoSave();
@@ -800,6 +805,16 @@ public class GameActivity extends Activity
         }
         axisButtons = buttons;
 
+        // The right stick zooms: up to get closer, down to go back. Most
+        // controllers report it as Z/RZ, some as RX/RY.
+        float zoomAxis = event.getAxisValue(MotionEvent.AXIS_RZ);
+        if (Math.abs(zoomAxis) < ZOOM_DEAD_ZONE) {
+            zoomAxis = event.getAxisValue(MotionEvent.AXIS_RY);
+        }
+        if (emulator != null) {
+            emulator.setZoomSpeed(Math.abs(zoomAxis) < ZOOM_DEAD_ZONE ? 0 : -zoomAxis);
+        }
+
         // Analog triggers act like the LT and RT keys, so they follow the
         // same assignments. Depending on the mode, controllers report them as
         // the trigger or the brake/gas axes.
@@ -817,6 +832,12 @@ public class GameActivity extends Activity
         }
         updateButtons();
         return true;
+    }
+
+    private static final float ZOOM_DEAD_ZONE = 0.3f;
+
+    private String zoomKey() {
+        return "zoom:" + gameName;
     }
 
     /** Turns an analog trigger into presses and releases, with some hysteresis. */

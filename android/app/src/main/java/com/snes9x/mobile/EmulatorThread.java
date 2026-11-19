@@ -53,6 +53,12 @@ final class EmulatorThread extends Thread {
 
     private volatile boolean fastForward;
     private volatile float volume = 1f;
+    // Zoom into the middle of the picture, 1x to MAX_ZOOM. The right stick
+    // sets how fast it changes; the thread moves it a little every frame.
+    static final float MAX_ZOOM = 3f;
+    private static final float ZOOM_PER_SECOND = 1.5f;
+    private volatile float zoom = 1f;
+    private volatile float zoomSpeed;
     private volatile boolean rewinding;
     private volatile int filter = FILTER_SHARP;
 
@@ -93,6 +99,19 @@ final class EmulatorThread extends Thread {
 
     boolean isFastForward() {
         return fastForward;
+    }
+
+    void setZoom(float zoom) {
+        this.zoom = Math.max(1f, Math.min(MAX_ZOOM, zoom));
+    }
+
+    float getZoom() {
+        return zoom;
+    }
+
+    /** -1..1: positive zooms in, negative zooms out, 0 stops. */
+    void setZoomSpeed(float speed) {
+        zoomSpeed = speed;
     }
 
     /** The game's sound volume, from 0 (silent) to 1 (full). */
@@ -181,6 +200,10 @@ final class EmulatorThread extends Thread {
                 }
             }
             long workStart = System.nanoTime();
+            float speed = zoomSpeed;
+            if (speed != 0) {
+                setZoom(zoom * (float) Math.pow(1 + ZOOM_PER_SECOND, speed * frameNanos / 1e9));
+            }
 
             if (rewinding) {
                 // No sound while rewinding; two snapshots a frame (each is
@@ -339,13 +362,19 @@ final class EmulatorThread extends Thread {
             int left = (cw - w) / 2;
             int top = alignTop ? 0 : (ch - h) / 2;
             canvas.drawColor(Color.BLACK);
-            source.set(0, 0, width, height);
+            // Zoomed in, only the middle of the picture is shown, bigger.
+            float shown = zoom;
+            int sw = Math.max(1, Math.round(width / shown));
+            int sh = Math.max(1, Math.round(height / shown));
+            int sx = (width - sw) / 2;
+            int sy = (height - sh) / 2;
+            source.set(sx, sy, sx + sw, sy + sh);
             destination.set(left, top, left + w, top + h);
             int mode = filter;
             paint.setFilterBitmap(mode != FILTER_SHARP);
             canvas.drawBitmap(frame, source, destination, paint);
             if (mode == FILTER_CRT) {
-                canvas.drawBitmap(scanlines(height, h), null, destination, scanlinePaint);
+                canvas.drawBitmap(scanlines(sh, h), null, destination, scanlinePaint);
             }
         } finally {
             try {
