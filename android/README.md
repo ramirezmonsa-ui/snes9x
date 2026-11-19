@@ -54,9 +54,11 @@ abrir el menú).
 **Botones traseros (M1/M2, paletas…):** en la mayoría de los controles no
 mandan nada por sí solos; hay que programarlos en el propio control para que
 copien otro botón (la **i** de la pantalla de configuración lo explica). Lo
-más cómodo es que copien **L3** y **R3** (apretar las palancas): en la app,
-L3 rebobina y R3 es avance rápido. Por ejemplo, en la EasySMX M15: mantén
-**FN + M1** dos segundos, aprieta L3 y toca M1 otra vez; lo mismo con M2 y R3.
+más cómodo es que copien **L3** (apretar la palanca izquierda), que estos
+juegos no usan, y después asignarle a L3 lo que quieras en Configurar
+control. R3 (apretar la palanca derecha) mueve la vista cuando hay zoom.
+Por ejemplo, en la EasySMX M15: mantén **FN + M1** dos segundos, aprieta L3
+y toca M1 otra vez.
 
 De fábrica, los botones funcionan por posición, igual que en el control de SNES:
 
@@ -68,7 +70,7 @@ De fábrica, los botones funcionan por posición, igual que en el control de SNE
 | Botón de arriba (Y) | X |
 | LB | L |
 | RB | R |
-| LT (L2) o L3 | Rebobinar (mantener) |
+| LT (L2) | Rebobinar (mantener) |
 | RT (R2) | Avance rápido (prender/apagar) |
 | Cruceta o palanca izquierda | Cruceta |
 | Start / Menú | Start |
